@@ -24,3 +24,9 @@ docker compose exec web sh                  # shell dentro do contêiner
 
 A app responde em http://localhost:3000.
 Lint: `docker compose exec web pnpm lint`.
+
+## Práticas de código
+
+As regras de framework do Next.js 16.4 (Cache Components, Partial Prefetching, proxy, BFF,
+variáveis de ambiente e a fronteira entre servidor e cliente) estão em `.claude/rules/nextjs.md`,
+na raiz do repositório.

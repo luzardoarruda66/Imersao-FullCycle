@@ -7,3 +7,20 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Ambiente de desenvolvimento
+
+Tudo roda em contêineres, pelo `compose.yaml` da raiz; o porquê das regras está no LLD, seção 10.
+O pnpm roda só dentro do contêiner, nunca no host: o `node_modules` fica na pasta do host,
+compartilhada com o contêiner.
+
+```
+docker compose up -d --build                # na raiz; o contêiner instala as dependências ao subir
+docker compose logs -f web                  # acompanha o pnpm install
+docker compose exec web pnpm dev            # sobe o Next.js
+docker compose exec web pnpm add <pacote>
+docker compose exec web sh                  # shell dentro do contêiner
+```
+
+A app responde em http://localhost:3000.
+Lint: `docker compose exec web pnpm lint`.

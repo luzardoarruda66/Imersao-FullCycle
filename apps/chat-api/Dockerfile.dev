@@ -1,0 +1,8 @@
+FROM node:26-slim
+
+RUN npm install -g pnpm@12.18.0
+
+USER node
+WORKDIR /workspace
+
+CMD ["sh", "-c", "pnpm install && tail -f /dev/null"]

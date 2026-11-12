@@ -1,6 +1,6 @@
 # LLD — Full Cycle Chat
 
-2026-11-10 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
+2026-11-12 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
 
 **Onde mora cada fato**
 
@@ -333,8 +333,30 @@ A definir. O que cada contêiner recebe está no HLD, seção 8, "Configuração
 
 ## 10. Ambiente de desenvolvimento
 
-A definir. O que substitui cada serviço de produção está no HLD, seção 9, "Implantação e
-ambientes".
+O que substitui cada serviço de produção está no HLD, seção 9, "Implantação e ambientes". O
+`compose.yaml` da raiz sobe os serviços; os comandos estão no `AGENTS.md` de cada app.
+
+- **Serviços presentes:** `web`, `chat-api`, Postgres e o substituto do S3 (SeaweedFS). O Redis, o
+  Serviço de agentes e o Worker entram com o projeto `agents`; até lá, nenhum código do `web` ou
+  do `chat-api` pode exigir o Redis para subir localmente.
+- **Contêiner das apps:** a imagem não guarda dependências. O repositório inteiro é montado em
+  `/workspace`, e o contêiner, ao subir, roda `pnpm install` e fica de pé sem iniciar a app; o
+  servidor de desenvolvimento é iniciado à mão, dentro dele. O `node_modules` fica na pasta do
+  host, e só o contêiner instala ou adiciona dependências: rodar o pnpm também no host faz os
+  dois lados disputarem a mesma pasta.
+- **Bancos e usuários:** uma instância de Postgres com os três bancos, criados na primeira subida
+  por `docker/postgres/init.sql`.
+
+  | Banco | Dono | Acesso de leitura |
+  | --- | --- | --- |
+  | `chat` | `chat_api` | — |
+  | `agents` | `agents` | — |
+  | `business` | `postgres` (o script de carga) | `business_readonly`, só `SELECT` ([ADR 0013](adr/0013-somente-leitura-banco-e-codigo.md)) |
+
+- **Armazenamento de objetos:** o SeaweedFS sobe sem bucket e sem credenciais; os dois entram com
+  o código do Worker e da URL assinada. O navegador baixa o PDF direto pela URL assinada, e por
+  isso ela precisa apontar para um endereço que o navegador alcança, e não para o nome do
+  contêiner (pendência em "Questões em aberto").
 
 ## 11. Decisões
 
@@ -416,3 +438,5 @@ As decisões que mudam o desenho estão no HLD, seção 10.
       é constante ou variável.
 - [ ] Nomes, projetos e origem das variáveis de ambiente.
 - [ ] Diferenças do ambiente local que mudam o código ou os testes.
+- [ ] Endereço usado para assinar a URL do PDF no ambiente local (alcançável pelo navegador, e
+      não o nome interno do contêiner do S3).

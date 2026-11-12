@@ -48,3 +48,8 @@ docker compose exec chat-api sh             # shell dentro do contêiner
 
 A app responde em http://localhost:3001.
 Testes e lint: `docker compose exec chat-api pnpm test`, `pnpm test:e2e`, `pnpm lint`.
+
+## Práticas de código
+
+As regras de framework do NestJS 12 (validação, erros, WebSocket, sessão, configuração, TypeORM,
+OpenAPI e testes) estão em `.claude/rules/nestjs.md`, na raiz do repositório.

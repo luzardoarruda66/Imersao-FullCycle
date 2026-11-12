@@ -19,7 +19,7 @@
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
 | Schema das variáveis de ambiente | A definir |
-| Práticas e comandos | `apps/*/AGENTS.md`, um por app (`web` e `chat-api` existem; `agents` planejado), apontados pelo `AGENTS.md` da raiz (planejado) |
+| Práticas e comandos | `apps/*/AGENTS.md`, um por app (`web` e `chat-api` existem; `agents` planejado), apontados pelo `AGENTS.md` da raiz (planejado); as regras de framework ficam em `.claude/rules/`, apontadas por esses arquivos |
 
 Os snapshots OpenAPI ficam gravados no repositório, e a CI falha quando o código muda o contrato
 sem atualizar o snapshot.
@@ -118,7 +118,8 @@ novas tentativas e idempotência").
 - **Cookie de sessão:** `httpOnly`, `Secure` e válido para os subdomínios (HLD 6.1). O valor de
   `SameSite` e a defesa contra CSRF estão a definir.
 - **Identificador de sessão:** formato e forma de guardar no Banco do chat a definir.
-- **Senha:** guardada como hash Argon2id.
+- **Senha:** guardada como hash Argon2id. A escolha está em revisão (pendência em "Questões em
+  aberto"), porque o `PasswordHasher` do `@nestjs/authentication` usa scrypt.
 - **Limite de tentativas de login:** a chave (e-mail, IP ou os dois) está a definir; os números
   estão em "Valores e configuração". A origem do IP atrás do proxy da PaaS está a definir, porque
   depende da PaaS escolhida (HLD, seção 12).
@@ -296,8 +297,8 @@ atualiza esse cache direto, sem nova requisição.
 
 **Sessão no cliente.**
 
-- O middleware do Next confere só se o cookie de sessão existe; sem ele, manda para "Entrar". A
-  validação de verdade é da API do chat.
+- O proxy do Next (`src/proxy.ts`, o antigo middleware) confere só se o cookie de sessão existe;
+  sem ele, manda para "Entrar". A validação de verdade é da API do chat.
 - Qualquer 401 vindo do BFF manda para "Entrar".
 - Um 401 no WebSocket fecha a conexão e manda para "Entrar".
 
@@ -399,6 +400,8 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 
 - [ ] `SameSite` do cookie e defesa contra CSRF.
 - [ ] Formato do identificador de sessão e forma de guardá-lo.
+- [ ] Hash de senha: Argon2id num provider próprio (pacote `argon2`, nativo), ou o scrypt do
+      `PasswordHasher` do `@nestjs/authentication`.
 - [ ] Credenciais de bot (por processo ou por agente) e credencial de serviço.
 - [ ] Chave do limite de tentativas de login (e-mail, IP ou os dois).
 - [ ] Origem do IP atrás do proxy (depende da PaaS, ainda aberta no HLD).

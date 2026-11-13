@@ -174,12 +174,12 @@ tem permissão: qualquer um dos dois destrói a confiança no produto.
 
 - **Fase 1, fechar o MVP.** Objetivo: completar a aposta.
 - **Fase 2, operar como produto.** Objetivo: uma empresa conseguir usar sem depender de script para criar contas e permissões.
-  Entram cadastro e convite de pessoas, tela de papéis e permissões, remoção de membros de canal
-  privado, entrar e sair de canais, busca de mensagens, threads, reações e anexos. Começa
-  quando a Fase 1 atingir as metas de qualidade: ≥ 98% na avaliação, 0 número errado entregue,
-  p95 ≤ 5 s e ≤ US$ 0,01 por pedido.
-- **Sem fase:** gráfico na conversa, relatório agendado e agente que age sem ser chamado, a
-  definir.
+  Começa quando a Fase 1 atingir as metas de qualidade: ≥ 98% na avaliação, 0 número errado
+  entregue, p95 ≤ 5 s e ≤ US$ 0,01 por pedido.
+- **Sem fase:** itens cuja entrada no roadmap ainda está em aberto (seção "Questões em aberto").
+
+As funcionalidades de cada fase, as dependências entre elas e o status de cada uma ficam no
+[roadmap](roadmap.md).
 
 ## Questões em aberto
 

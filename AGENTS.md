@@ -9,6 +9,7 @@ Em `docs/` estão os documentos que definem o produto, a arquitetura e os detalh
 3. `docs/lld.md`: Low-level design, documento de arquitetura de baixo nível. Aqui ficam os detalhes de implementação.
 4. `docs/design-system.md`: linguagem visual da interface. Aqui ficam os tokens de cor, tipografia, espaçamento, raio e sombra, os estados de interação, os componentes, o comportamento responsivo e o fluxo de trabalho com o Figma.
 5. `GLOSSARY.md`, na raiz: o vocabulário do domínio do produto. Use esses termos nos documentos e no planejamento.
+6. `docs/roadmap.md`: funcionalidades por fase, com dependências, bloqueios e status. Consulte ao escolher a próxima tarefa ou planejar uma funcionalidade.
 
 Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da stack e as práticas de código dele:
 
@@ -19,6 +20,7 @@ Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da
 
 - **O que o sistema faz** fica em `docs/`: escopo, arquitetura, esquema, contrato, regras de negócio e configuração.
 - **Nunca nos dois.** Uma informação tem um dono só, e o outro arquivo aponta para ele pelo nome do documento e da seção, sem repetir o conteúdo.
+- **O status do roadmap anda com o trabalho.** A spec ou o ticket que planeja uma linha do `docs/roadmap.md` muda o Status dela para Especificada e preenche o Plano; o PR que a entrega muda para Concluída.
 - **HLD e LLD mudam pela skill deles.** Quando uma tarefa muda algo que o `docs/hld.md` ou o `docs/lld.md` registra, carregue a skill `hld` ou `lld` e use o modo atualizar antes de editar o arquivo.
 - **Informações que deveriam estar nos arquivos de memória** como AGENTS.md e rules, não devem ser repetidas nos documentos de arquitetura. Faça ponteiros destes arquivos para os arquivos de memória correspondentes.
 

@@ -54,8 +54,16 @@ Encerrar a sessão do navegador em que se está.
 _Evite_: logout, deslogar
 
 **Encerrar sessões**:
-Cortar o acesso de um membro nos navegadores dele, pela operação ou ao trocar a senha.
+Cortar o acesso de um membro: em todos os navegadores dele, pela operação ou ao redefinir a senha; nos outros navegadores, quando ele troca a senha.
 _Evite_: revogar, derrubar, expulsar
+
+**Trocar a senha**:
+O próprio membro, com a sessão aberta, mudar a senha da conta informando a senha atual.
+_Evite_: alterar a senha, mudar a senha
+
+**Redefinir a senha**:
+A operação dar uma senha nova à conta de um membro, sem a senha atual. Encerra as sessões dele.
+_Evite_: resetar, recuperar a senha
 
 ### Conversas
 

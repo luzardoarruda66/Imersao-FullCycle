@@ -29,9 +29,9 @@ Regras de framework tiradas da documentação do NestJS 12 (docs.nestjs.com, via
 ## Sessão, senha e limite de tentativas
 
 - `@nestjs/authentication` cobre o cookie de sessão (`SessionCookieProvider`, `SignInService`), o guard global com `@Public()` e o handshake do WebSocket. Avalie esse pacote antes de escrever a autenticação na mão ([ADR 0016](../../docs/adr/0016-sessao-na-api-do-chat.md)).
-- O hash de senha está em revisão no LLD ("Questões em aberto"): Argon2id com o pacote `argon2` num provider próprio, ou o scrypt do `PasswordHasher` do pacote. Não implemente antes de a escolha ser registrada.
+- O hash de senha é o scrypt do `PasswordHasher` do pacote ([ADR 0023](../../docs/adr/0023-scrypt-hash-de-senha.md)); não escreva um provider de hash próprio.
 - O `verify()` de senha recebe `undefined` quando a conta não existe e confere um hash falso, para que o tempo de resposta não revele quais e-mails existem.
-- O limite de tentativas de login é do `@nestjs/throttler`, com `@Throttle()` na rota de entrar. A chave e os números estão no LLD, seções 3 e 9.
+- O limite de erros seguidos no login é um contador próprio no Banco do chat, e não o `@nestjs/throttler`, que conta requisições e não zera no acerto. O throttler fica só com o teto por IP, com `@Throttle()` na rota de entrar. A chave, a regra e os números estão no LLD, seções "Segurança", "Sessão e login" e "Valores e configuração".
 - Nos testes, sobrescreva o hasher com um custo baixo (`overrideProvider(PasswordHasher)`), senão a suíte fica lenta.
 
 ## Configuração

@@ -4,9 +4,9 @@ Funcionalidade F1-01 do roadmap (`docs/roadmap.md`, Fase 1), item 1 do "Escopo d
 
 ## 1. Resumo executivo
 
-- **Problema**: sem entrar, ninguém usa o chat nem pede nada a um agente, e o produto promete que nenhuma credencial fica acessível ao navegador e que a sessão é revogável. Hoje as contas existem só no banco, criadas por script, e a pessoa não tem como acessá-las.
+- **Problema**: sem entrar, ninguém usa o chat nem pede nada a um agente, e o produto promete que nenhuma credencial fica acessível ao navegador e que a sessão pode ser encerrada a qualquer momento. Hoje as contas existem só no banco, criadas por script, e a pessoa não tem como acessá-las.
 - **Solução proposta**: a pessoa entra com e-mail e senha numa conta criada pela empresa, continua logada em todas as abas do navegador por até 30 dias sem uso, sai quando quiser e troca a própria senha depois de logada.
-- **Critérios de sucesso**: a F1-01 não move sozinha nenhuma métrica do product brief (seção "Objetivos e métricas de sucesso"). Ela é pré-requisito de todas: sem login não há "pessoas ativas na semana", o denominador de **Uso do agente**. Ela também cumpre o requisito não funcional **Sessão** do brief (seção "Requisitos não funcionais e restrições").
+- **Critérios de sucesso**: a F1-01 não move sozinha nenhuma métrica do product brief (seção "Objetivos e métricas de sucesso"). Ela é pré-requisito de todas: sem entrar não há "pessoas ativas na semana", o denominador de **Uso do agente**. Ela também cumpre o requisito não funcional **Sessão** do brief (seção "Requisitos não funcionais e restrições").
 
 ## 2. Experiência do usuário e funcionamento
 

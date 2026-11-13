@@ -4,7 +4,7 @@ Linguagem visual da interface do Full Cycle Chat: tokens, componentes, ícones, 
 
 **Onde cada coisa mora**
 
-- **Design:** o arquivo do Figma (<https://www.figma.com/design/plW17JDOoRHydUJIIi2u87/slack>, `fileKey` `plW17JDOoRHydUJIIi2u87`). As variables, os estilos e os componentes de lá são a fonte do design.
+- **Design:** o arquivo do Figma (<https://www.figma.com/design/GXeHfkmxrSH9mGMHTweQSP/slack--Copy->, `fileKey` `GXeHfkmxrSH9mGMHTweQSP`). As variables, os estilos e os componentes de lá são a fonte do design.
 - **Especificação:** este documento. Nomes, valores e regras de uso dos tokens e dos componentes.
 - **Implementação:** `apps/web/src/app/globals.css` (tokens) e `apps/web/src/app/components/` (componentes).
 - **Fora daqui:** comandos, Server Components e estrutura de pastas ficam no `apps/web/AGENTS.md`. Nomes de identificadores ficam em `.claude/rules/next-web-coding-standards.md`. Escopo e plataforma ficam no `docs/product-brief.md`, seção "Escopo do MVP".
@@ -56,7 +56,17 @@ Abaixo está o `globals.css` de destino. Os valores são os primitivos já resol
 ```css
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* escuro: escolha "dark", ou sistema escuro sem a escolha "light" */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
 
 :root {
   /* superfícies */
@@ -122,48 +132,48 @@ Abaixo está o `globals.css` de destino. Os valores são os primitivos já resol
   --elevation-1: 0 1px 3px #00000014;
   --elevation-2: 0 4px 12px #0000001f, 0 0 0 1px #1d1c1d21;
   --elevation-3: 0 18px 48px #0000003d, 0 6px 16px #00000024, 0 0 0 1px #1d1c1d21;
-}
 
-:root[data-theme="dark"] {
-  --surface: #1a1d21;               /* neutral/950 */
-  --surface-subtle: #222529;        /* neutral/850 */
-  --surface-raised: #222529;        /* neutral/850 */
-  --surface-inset: #121417;         /* slate/950 */
-  --surface-overlay: #00000099;     /* alpha/black-a60 */
-  --fg: #d1d2d3;                    /* slate/100 */
-  --fg-muted: #ababad;              /* slate/300 */
-  --fg-subtle: #8d8e90;             /* slate/400 */
-  --fg-inverse: #1d1c1d;            /* neutral/900 */
-  --border: #3b3d42;                /* slate/700 */
-  --border-subtle: #2c2e33;         /* slate/800 */
-  --border-strong: #6f7074;         /* slate/500 */
-  --primary-hover: #148567;         /* green/500 */
-  --primary-active: #006b4f;        /* green/700 */
-  --link: #1d9bd1;                  /* blue/400 */
-  --link-hover: #40b3e4;            /* blue/300 */
-  --danger-hover: #e96379;          /* red/400 */
-  --danger-fg: #e96379;             /* red/400 */
-  --success: #2bac76;               /* green/400 */
-  --mention-bg: #1d9bd129;          /* alpha/blue-400-a16 */
-  --mention-fg: #1d9bd1;            /* blue/400 */
-  --mention-self-bg: #f2c74447;     /* alpha/yellow-300-a28 */
-  --mention-self-fg: #f2c744;       /* yellow/300 */
-  --highlight-bg: #f2c7441a;        /* alpha/yellow-300-a10 */
-  --highlight-border: #f2c74480;    /* alpha/yellow-300-a50 */
-  --chrome: #121016;                /* aubergine/975 */
-  --sidebar: #19171d;               /* aubergine/950 */
-  --sidebar-fg: #b9babd;            /* slate/200 */
-  --sidebar-hover: #ffffff0f;       /* alpha/white-a06 */
-  --sidebar-border: #ffffff1a;      /* alpha/white-a10 */
-  --sidebar-field: #ffffff1a;       /* alpha/white-a10 */
-  /* elevação: borda + superfície mais clara no escuro */
-  --elevation-1: 0 0 0 1px #2c2e33;
-  --elevation-2: 0 4px 12px #00000066, 0 0 0 1px #3b3d42;
-  --elevation-3: 0 18px 48px #00000099, 0 0 0 1px #3b3d42;
+  @variant dark {
+    --surface: #1a1d21;               /* neutral/950 */
+    --surface-subtle: #222529;        /* neutral/850 */
+    --surface-raised: #222529;        /* neutral/850 */
+    --surface-inset: #121417;         /* slate/950 */
+    --surface-overlay: #00000099;     /* alpha/black-a60 */
+    --fg: #d1d2d3;                    /* slate/100 */
+    --fg-muted: #ababad;              /* slate/300 */
+    --fg-subtle: #8d8e90;             /* slate/400 */
+    --fg-inverse: #1d1c1d;            /* neutral/900 */
+    --border: #3b3d42;                /* slate/700 */
+    --border-subtle: #2c2e33;         /* slate/800 */
+    --border-strong: #6f7074;         /* slate/500 */
+    --primary-hover: #148567;         /* green/500 */
+    --primary-active: #006b4f;        /* green/700 */
+    --link: #1d9bd1;                  /* blue/400 */
+    --link-hover: #40b3e4;            /* blue/300 */
+    --danger-hover: #e96379;          /* red/400 */
+    --danger-fg: #e96379;             /* red/400 */
+    --success: #2bac76;               /* green/400 */
+    --mention-bg: #1d9bd129;          /* alpha/blue-400-a16 */
+    --mention-fg: #1d9bd1;            /* blue/400 */
+    --mention-self-bg: #f2c74447;     /* alpha/yellow-300-a28 */
+    --mention-self-fg: #f2c744;       /* yellow/300 */
+    --highlight-bg: #f2c7441a;        /* alpha/yellow-300-a10 */
+    --highlight-border: #f2c74480;    /* alpha/yellow-300-a50 */
+    --chrome: #121016;                /* aubergine/975 */
+    --sidebar: #19171d;               /* aubergine/950 */
+    --sidebar-fg: #b9babd;            /* slate/200 */
+    --sidebar-hover: #ffffff0f;       /* alpha/white-a06 */
+    --sidebar-border: #ffffff1a;      /* alpha/white-a10 */
+    --sidebar-field: #ffffff1a;       /* alpha/white-a10 */
+    /* elevação: borda + superfície mais clara no escuro */
+    --elevation-1: 0 0 0 1px #2c2e33;
+    --elevation-2: 0 4px 12px #00000066, 0 0 0 1px #3b3d42;
+    --elevation-3: 0 18px 48px #00000099, 0 0 0 1px #3b3d42;
+  }
 }
 ```
 
-Os tokens que não aparecem no bloco escuro (`--primary`, `--on-primary`, `--focus`, `--danger`, `--warning`, `--on-warning`, `--badge`, `--on-badge`, presença, `--sidebar-fg-strong`, `--sidebar-active`, `--sidebar-on-active` e avatares) são iguais nos dois temas.
+Os tokens que não aparecem no bloco `@variant dark` (`--primary`, `--on-primary`, `--focus`, `--danger`, `--warning`, `--on-warning`, `--badge`, `--on-badge`, presença, `--sidebar-fg-strong`, `--sidebar-active`, `--sidebar-on-active` e avatares) são iguais nos dois temas.
 
 O `@theme inline` expõe cada token como utilitário do Tailwind, com o mesmo nome:
 
@@ -236,9 +246,13 @@ Resultado: `bg-surface`, `text-fg-muted`, `border-border-subtle`, `bg-primary ho
 
 ### Tema claro e escuro
 
-A pessoa escolhe o tema (brief, "Escopo do MVP", item 7). O tema fica no atributo `data-theme` do `<html>`, aplicado no servidor para não piscar na carga. Sem o atributo, vale o claro. Onde a escolha é gravada é decisão do LLD (seção "8. Cliente", ainda a definir).
+Enquanto a pessoa não escolhe, o tema segue o do sistema operacional (`prefers-color-scheme`). Ela pode escolher o claro ou o escuro (brief, "Escopo do MVP", item 7), e a escolha gravada vale sobre o sistema.
 
-O `ThemeToggle` mostra a lua no tema claro e o sol no escuro.
+- **Escolha:** fica no atributo `data-theme` do `<html>` (`light` ou `dark`), aplicado no servidor para não piscar na carga. Onde a escolha é gravada é decisão do LLD (seção "8. Cliente", ainda a definir).
+- **Sem escolha:** o `<html>` vai sem o atributo, e o CSS segue o sistema pela media query, sem JavaScript e sem piscar. O servidor não sabe o tema do sistema, e não precisa saber.
+- **Variant `dark`:** vale com `data-theme="dark"`, ou com o sistema escuro e sem `data-theme="light"` (bloco acima). Os tokens escuros ficam uma vez só, dentro de `@variant dark`.
+
+O `ThemeToggle` mostra a lua quando o tema em uso é o claro e o sol quando é o escuro, venha ele da escolha ou do sistema; o clique grava a escolha do tema oposto. Os dois ícones vão no HTML e o variant `dark` esconde um deles, para o servidor não precisar saber o tema do sistema.
 
 ### Tipografia
 
@@ -612,7 +626,7 @@ A seção **"Erros corretos (difere do código)"** traz a versão certa de estad
 ### Antes de qualquer chamada
 
 1. Leia este documento.
-2. Chame `create_session` com o `fileKey` `plW17JDOoRHydUJIIi2u87` e reuse o `sessionId` em todas as chamadas da tarefa.
+2. Chame `create_session` com o `fileKey` `GXeHfkmxrSH9mGMHTweQSP` e reuse o `sessionId` em todas as chamadas da tarefa.
 3. Da URL, tire o `node-id` e troque `-` por `:` (`?node-id=22-12030` vira `22:12030`).
 
 ### Do Figma para o código

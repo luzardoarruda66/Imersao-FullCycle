@@ -52,6 +52,16 @@ O `next.config.ts` liga `cacheComponents` e `partialPrefetching`. Quase tudo aba
 - Componentes são de servidor por padrão. `'use client'` vai no ponto mais baixo da árvore que precisa de estado, efeito ou API do navegador (o `socket.io-client` e o SWR entram aqui).
 - O que atravessa a fronteira de servidor para cliente precisa ser serializável: dados, não funções nem instâncias de classe (as Server Functions são a exceção).
 
+## Testes
+
+A ferramenta de cada tipo está no LLD (seção "1. Estrutura do código"); aqui fica como montá-la, pelo guia `01-app/02-guides/testing/vitest.md` da cópia local.
+
+- Unitário e de componente: Vitest com React Testing Library, em `jsdom`, com `@vitejs/plugin-react` e `vite-tsconfig-paths` no `vitest.config.mts`. Para clique e digitação, use o `@testing-library/user-event`, e não o `fireEvent`.
+- Cubra aqui as funções puras (validação do destino guardado, schemas das Server Actions, tradução dos erros da API do chat), os Client Components e os Server Components síncronos.
+- Server Component `async` não roda no Vitest: teste-o pelo Playwright, junto dos fluxos entre telas, do cookie e do proxy.
+- Busque elementos pelo papel e pelo nome acessível (`getByRole`), como o usuário e o leitor de tela os encontram, e não por classe ou `data-testid`.
+- Mocks são `vi.fn()`. A camada `server-only` de acesso à API do chat é substituída no teste, e nenhum teste unitário chama a API de verdade.
+
 ## Skills oficiais do Next
 
 Para adoção ou otimização de Cache Components e Partial Prefetching, o próprio Next publica skills (`next-cache-components-optimizer`, `next-partial-prefetching-optimizer`, `next-dev-loop`). Elas estão no guia `01-app/02-guides/ai-agents.md` da cópia local. Não estão instaladas no projeto; pergunte antes de instalar.

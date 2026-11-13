@@ -10,7 +10,7 @@
 | Decisões com porquê | `docs/adr/`, com o índice na seção "Decisões" deste documento e do HLD |
 | Escopo e público | [Product brief](product-brief.md) |
 | Vocabulário | [GLOSSARY.md](../GLOSSARY.md), na raiz |
-| Linguagem visual (cores, componentes, microtexto) | [Figma](https://www.figma.com/design/plW17JDOoRHydUJIIi2u87/slack) |
+| Linguagem visual (cores, componentes, microtexto) | [Figma](https://www.figma.com/design/GXeHfkmxrSH9mGMHTweQSP/slack--Copy-) |
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (planejado) |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (planejado) |
@@ -55,7 +55,9 @@ docs/             HLD, LLD, ADRs, brief
 | API do chat | NestJS | HLD, seção 5 |
 | ORM e migrações do Banco do chat | TypeORM | [ADR 0018](adr/0018-typeorm-api-do-chat.md) |
 | Snapshot do contrato da API do chat | `@nestjs/swagger` | Gera o OpenAPI a partir do código |
-| Hash de senha | Argon2id | Primeira recomendação da OWASP para senhas |
+| Sessão, cookie e guard de autenticação da API do chat | `@nestjs/authentication` | Cobre o cookie de sessão, o guard global com `@Public()` e o handshake do WebSocket sobre a sessão no Banco do chat ([ADR 0016](adr/0016-sessao-na-api-do-chat.md)), sem escrever a autenticação à mão |
+| Hash de senha | scrypt, pelo `PasswordHasher` do `@nestjs/authentication` | [ADR 0023](adr/0023-scrypt-hash-de-senha.md) |
+| Teto de requisições por IP | `@nestjs/throttler`, em memória | Pacote oficial do Nest; não exige o Redis, ausente no ambiente local |
 | Gerenciador dos projetos TypeScript | pnpm, um projeto por pasta, sem workspace | [ADR 0017](adr/0017-projetos-pnpm-independentes.md) |
 | Agentes | Python + Google ADK | [ADR 0003](adr/0003-agentes-python-google-adk.md) |
 | HTTP do Serviço de agentes | FastAPI próprio, com as rotas chamando o `Runner` do ADK | A definir |
@@ -64,9 +66,11 @@ docs/             HLD, LLD, ADRs, brief
 | Acesso ao modelo, trocável por configuração (HLD, seção 2) | A definir | — |
 | Geração do PDF | A definir | — |
 | Acesso ao Banco dos agentes e migrações | A definir | — |
-| Validação das variáveis de ambiente | A definir | — |
+| Validação de entrada e das variáveis de ambiente, nos projetos TypeScript | Zod | Standard Schema: o mesmo tipo de schema no pipe do Nest, no `ConfigModule` e nas Server Actions do `web` |
+| Validação das variáveis de ambiente, no projeto Python | A definir | — |
 | Parser da conferência de somente leitura | A definir | — |
 | Log estruturado | A definir | — |
+| Testes de navegador | Playwright | A imagem oficial roda num contêiner próprio, sem instalar navegador nas imagens das apps (seção "Ambiente de desenvolvimento") |
 
 ## 2. Componentes e dependências
 
@@ -115,14 +119,30 @@ novas tentativas e idempotência").
 
 ### Segurança
 
-- **Cookie de sessão:** `httpOnly`, `Secure` e válido para os subdomínios (HLD 6.1). O valor de
-  `SameSite` e a defesa contra CSRF estão a definir.
-- **Identificador de sessão:** formato e forma de guardar no Banco do chat a definir.
-- **Senha:** guardada como hash Argon2id. A escolha está em revisão (pendência em "Questões em
-  aberto"), porque o `PasswordHasher` do `@nestjs/authentication` usa scrypt.
-- **Limite de tentativas de login:** a chave (e-mail, IP ou os dois) está a definir; os números
-  estão em "Valores e configuração". A origem do IP atrás do proxy da PaaS está a definir, porque
-  depende da PaaS escolhida (HLD, seção 12).
+- **Cookie de sessão:** nome `sid`, `HttpOnly`, `Secure` e `SameSite=Lax`. O `Domain` vem da
+  configuração: o domínio pai em produção, para valer nos subdomínios (HLD 6.1), e vazio no
+  ambiente local, onde o cookie de `localhost` vale para o `web` e para a `chat-api`, porque cookie
+  não depende de porta. O prefixo `__Host-` fica de fora porque proíbe o `Domain`.
+- **CSRF:** as mutações do navegador são Server Actions, que comparam `Origin` com `Host`
+  ([ADR 0024](adr/0024-server-actions-nas-mutacoes.md)); somado ao `SameSite=Lax`, é a defesa. A
+  API do chat ignora o cookie numa escrita vinda de outra origem, mas a chamada do BFF chega sem
+  `Origin` e passa por essa conferência: por isso a defesa fica no BFF.
+- **Identificador de sessão:** um token aleatório no cookie; o Banco do chat guarda só o SHA-256
+  dele, no formato do `@nestjs/authentication`. Quem lê o banco não consegue montar um cookie
+  válido.
+- **Senha:** guardada com o scrypt do `PasswordHasher` ([ADR 0023](adr/0023-scrypt-hash-de-senha.md)).
+  Com e-mail inexistente, a conferência roda contra um hash falso, para o tempo de resposta não
+  revelar quem tem conta.
+- **Limite de tentativas de login:** a chave é o e-mail normalizado mais o IP. O contador de erros
+  seguidos fica numa tabela própria, e não na linha da pessoa, porque e-mail inexistente também
+  conta: sem isso, a falta de espera revelaria quem não tem conta. A regra está em "Sessão e
+  login"; os números, em "Valores e configuração". Além dele, o `@nestjs/throttler` põe um teto
+  por IP na rota de entrar (`teto de tentativas de entrar por IP`), contra quem testa muitos
+  e-mails de um IP só.
+- **Origem do IP:** o BFF manda o IP do navegador em `X-Forwarded-For`, e a API do chat confia
+  nesse cabeçalho só quando a chamada vem da rede interna (`trust proxy` restrito). Como o BFF
+  obtém o IP atrás do proxy da PaaS está a definir, porque depende da PaaS escolhida (HLD,
+  seção 12).
 - **Participação em canal privado e conversa direta:** o lugar no código onde a API do chat a
   confere está a definir.
 - **Credenciais de bot e de serviço:** a forma (um segredo por processo ou por agente) está a
@@ -164,7 +184,9 @@ depois do commit (publicação direta ou tabela de saída) estão a definir.
   `{ "error": { "code": "...", "message": "...", "details": ... } }`. O `code` é estável; o
   `message` é para pessoas.
 - O catálogo de códigos fica nos snapshots OpenAPI, como enum na resposta de erro de cada rota.
-- Quem traduz exceção em resposta está a definir.
+- Os códigos são em português, em `snake_case` (`credenciais_invalidas`).
+- Na API do chat, um filtro global `@Catch()` traduz toda exceção, inclusive as do próprio
+  framework, nesse corpo. No Serviço de agentes, quem traduz está a definir.
 - **Mensagem gravada, mas o Serviço de agentes não recebeu o pedido** (HLD 6.3): o BFF responde
   sucesso, com a mensagem gravada e um campo que diz que o agente não recebeu o pedido. A tela
   mostra a mensagem enviada e um aviso de erro do agente ao lado.
@@ -191,8 +213,9 @@ a lista completa do que nunca vai para o log estão a definir.
   mantém a anterior (HLD, seção 9).
 - Cada projeto tem um `.env.example` gravado no repositório, com todas as variáveis e valores
   falsos; o `.env` real fica no `.gitignore`.
-- A biblioteca de validação está a definir; a lista das variáveis fica em "Valores e
-  configuração".
+- A validação usa o Zod nos projetos TypeScript (no `ConfigModule.forRoot({ validate })` da API
+  do chat e no módulo `server-only` de configuração do `web`); no projeto Python está a definir. A
+  lista das variáveis fica em "Valores e configuração".
 
 ## 4. Dados
 
@@ -212,8 +235,9 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 
 | Banco | Entidade (HLD, seção 7) | Situação |
 | --- | --- | --- |
-| Chat | Pessoas (perfil, papel de administrador, permissão de dados) | a detalhar |
-| Chat | Sessões | a detalhar |
+| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | planejada |
+| Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | planejada |
+| Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | planejada |
 | Chat | Canais e membros | a detalhar |
 | Chat | Conversas diretas | a detalhar |
 | Chat | Mensagens (autor pessoa ou bot, citação, marca "dados de negócio") | a detalhar |
@@ -235,9 +259,13 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 - Prefixo `/v1` na API do chat e no Serviço de agentes; `/api`, sem versão, no BFF, porque o
   Frontend e o BFF são implantados juntos. Uma mudança que quebra entre serviços sai como nova
   versão do prefixo, em duas implantações.
-- Autenticação: o navegador fala com o BFF por cookie de sessão; o BFF leva a sessão à API do chat
-  (forma a definir); o BFF chama o Serviço de agentes com a credencial de serviço; os bots chamam a
-  API do chat com a credencial de bot e o identificador de pedido (forma em "Segurança").
+- Navegador e BFF: a página lê pelos Server Components; as mutações são Server Actions
+  ([ADR 0024](adr/0024-server-actions-nas-mutacoes.md)).
+- Autenticação: o navegador fala com o BFF por cookie de sessão. O BFF repassa o cookie `sid`
+  recebido, no cabeçalho `Cookie` de cada chamada à API do chat, e manda o IP do navegador em
+  `X-Forwarded-For`; ao entrar e ao sair, devolve ao navegador o `Set-Cookie` da API. O BFF
+  chama o Serviço de agentes com a credencial de serviço; os bots chamam a API do chat com a
+  credencial de bot e o identificador de pedido (forma em "Segurança").
 - Campos do JSON em `snake_case`, nas três APIs.
 - Paginação: a definir.
 - Erros: "Conceitos transversais de implementação", seção "Erros".
@@ -251,6 +279,10 @@ de eventos do WebSocket estão a definir. O único comportamento já decidido:
 | Método e caminho | Situação | Comportamento |
 | --- | --- | --- |
 | Envio de mensagem no BFF (caminho a definir) | a detalhar | Mensagem gravada e agente sem receber o pedido: "Conceitos transversais de implementação", seção "Erros" |
+| `POST /v1/sessoes` (API do chat) | planejada | Entrar: "Sessão e login". Erros: `credenciais_invalidas` (401), `tentativas_demais` (429, com `details.segundos_restantes`), `dados_invalidos` (400) |
+| `DELETE /v1/sessoes/atual` (API do chat) | planejada | Sair: apaga a sessão do cookie e devolve o `Set-Cookie` que o expira |
+| `GET /v1/eu` (API do chat) | planejada | O membro da sessão. Sem sessão válida: `sessao_invalida` (401), código de toda rota com sessão |
+| `PUT /v1/eu/senha` (API do chat) | planejada | Trocar a senha: "Sessão e login". Erros: `senha_atual_incorreta` (422), `senha_fraca` (422, com `details.regras_faltando`) |
 
 ## 6. Estados e regras
 
@@ -274,17 +306,21 @@ Os números estão em "Valores e configuração".
 
 - **Entrar.** E-mail sem diferença entre maiúsculas e minúsculas. E-mail inexistente e senha
   errada recebem a mesma resposta, para não revelar quem tem conta.
-- **Limite de tentativas.** Depois de `tentativas de login e janela` erradas seguidas, a entrada
+- **Limite de tentativas.** Conta por e-mail normalizado e IP (chave em "Segurança"), inclusive
+  para e-mail inexistente. Depois de `tentativas de login e janela` erradas seguidas, a entrada
   fica recusada durante a espera, inclusive com a senha certa, e a resposta diz quanto tempo falta.
-  A espera termina sozinha; não há bloqueio permanente da conta.
+  Um acerto zera o contador. A espera termina sozinha; não há bloqueio permanente da conta.
 - **Validade.** A sessão vence depois da `duração da sessão` sem uso; cada requisição ou conexão
-  autenticada renova o prazo.
+  autenticada renova o prazo. Não há teto absoluto: o `absoluteTtl` do pacote fica no máximo.
 - **Sair.** Apaga a sessão no Banco do chat (HLD 6.1). As outras sessões da pessoa continuam.
 - **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
-  `regra da senha`. Depois da troca, a sessão atual continua e as outras sessões da pessoa são
-  apagadas.
-- **Operação.** Encerrar as sessões de uma pessoa, ou redefinir a senha dela, pelo comando da API
-  do chat, apaga todas as sessões dela.
+  `regra da senha`, e a recusa lista as regras que faltaram. Depois da troca, a sessão atual
+  continua e as outras sessões da pessoa são apagadas.
+- **Operação.** O comando `contas` da API do chat cria a conta (e-mail e nome), redefine a senha,
+  encerra as sessões, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
+  geram uma senha aleatória que cumpre a `regra da senha` e a mostram uma vez só; não há troca
+  obrigatória no primeiro acesso. Encerrar as sessões, ou redefinir a senha, apaga todas as
+  sessões da pessoa.
 
 ## 7. Processos de segundo plano
 
@@ -292,8 +328,10 @@ Os números estão em "Valores e configuração".
 | --- | --- | --- | --- | --- |
 | Relatório em PDF (Worker) | Pedido na fila (HLD 6.5) | HLD 6.5 | Nova tentativa até `tentativas do Worker`; esgotadas, grava "não consegui" (HLD 6.5) | a detalhar |
 
-A idempotência da tarefa (chave no S3 e entrega única) e outras rotinas (retenção dos PDFs,
-sessões vencidas, perguntas pendentes vencidas) estão a definir.
+Sessões vencidas não têm rotina: cada sessão nova apaga as vencidas, e uma tentativa de entrar
+vencida é sobrescrita na próxima tentativa com a mesma chave. A idempotência da tarefa (chave no
+S3 e entrega única) e outras rotinas (retenção dos PDFs, perguntas pendentes vencidas) estão a
+definir.
 
 ## 8. Cliente
 
@@ -301,8 +339,8 @@ sessões vencidas, perguntas pendentes vencidas) estão a definir.
 
 | Rota | Acesso | Lê | Ações | Situação |
 | --- | --- | --- | --- | --- |
-| A definir | Público | — | Entrar com e-mail e senha | a detalhar |
-| A definir | Sessão | — | Trocar a própria senha; sair | a detalhar |
+| `/entrar` | Público | — | Entrar com e-mail e senha | planejada |
+| `/` (casca: Rail e menu do usuário) | Sessão | O membro da sessão | Trocar a própria senha, num diálogo; sair | planejada |
 | A definir | Sessão | Histórico da conversa | Enviar, editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Conversas, com não lidas e menções | Abrir conversa | a detalhar |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
@@ -319,9 +357,16 @@ atualiza esse cache direto, sem nova requisição.
 
 - O proxy do Next (`src/proxy.ts`, o antigo middleware) confere só se o cookie de sessão existe;
   sem ele, manda para "Entrar". A validação de verdade é da API do chat.
-- Ao mandar para "Entrar", guarda o caminho pedido e volta a ele depois de entrar. Só caminhos do
-  próprio produto são aceitos; qualquer outro destino vai para a tela principal.
-- Qualquer 401 vindo do BFF manda para "Entrar".
+- Ao mandar para "Entrar", guarda o caminho pedido na URL (`/entrar?para=/caminho`) e volta a ele
+  depois de entrar. Só vale um caminho que começa com uma `/` e não com `//` nem `/\`; qualquer
+  outro destino vai para a tela principal.
+- Qualquer 401 vindo do BFF manda para "Entrar". Com `sessao_invalida`, o BFF também apaga o
+  cookie: sem isso, o proxy veria o cookie velho e o navegador ficaria indo e voltando entre a
+  tela principal e "Entrar".
+- "Entrar" aberta com sessão válida (conferida na API, não no proxy) manda para a tela principal.
+- Com a API do chat fora do ar ou respondendo 5xx, a página logada mostra a porta "Erro de
+  sessão", com "Tentar de novo", em vez de mandar para "Entrar": uma queda da API não tira
+  ninguém da sessão.
 - Um 401 no WebSocket fecha a conexão e manda para "Entrar".
 
 **Notificação do navegador.**
@@ -345,6 +390,7 @@ atualiza esse cache direto, sem nova requisição.
 | Validade da URL do PDF | A definir | API do chat | A definir |
 | Duração da sessão | 30 dias sem uso (PRD da F1-01) | API do chat | A definir |
 | Tentativas de login e janela | 5 erradas seguidas; espera de 15 minutos (PRD da F1-01) | API do chat | A definir |
+| Teto de tentativas de entrar por IP | 30 em 15 minutos | API do chat | A definir |
 | Regra da senha | Mínimo de 8 caracteres, com uma maiúscula, uma minúscula, um número e um símbolo (PRD da F1-01) | API do chat | A definir |
 | Validade do identificador de pedido | A definir | API do chat | A definir |
 | Retenção dos eventos de reconexão | A definir | API do chat (Redis) | A definir |
@@ -368,6 +414,9 @@ O que substitui cada serviço de produção está no HLD, seção 9, "Implantaç
   servidor de desenvolvimento é iniciado à mão, dentro dele. O `node_modules` fica na pasta do
   host, e só o contêiner instala ou adiciona dependências: rodar o pnpm também no host faz os
   dois lados disputarem a mesma pasta.
+- **Testes:** os testes E2E da API do chat usam um banco `chat_test`, que o setup dos testes
+  cria e migra. Os testes de navegador rodam num serviço `e2e` do Compose, com a imagem oficial
+  do Playwright, atrás de um `profile` para não subir por padrão.
 - **Bancos e usuários:** uma instância de Postgres com os três bancos, criados na primeira subida
   por `docker/postgres/init.sql`.
 
@@ -392,6 +441,8 @@ O que substitui cada serviço de produção está no HLD, seção 9, "Implantaç
 | [0020](adr/0020-dados-de-negocio-pessoa-a-pessoa.md) | Mensagem de dados de negócio emitida pessoa a pessoa no WebSocket | aceita |
 | [0021](adr/0021-contadores-gravados.md) | Contadores de não lidas e de menções gravados na transação | aceita |
 | [0022](adr/0022-uuid-v7.md) | UUID v7 como id, gerado na aplicação | aceita |
+| [0023](adr/0023-scrypt-hash-de-senha.md) | scrypt do `@nestjs/authentication` como hash de senha | aceita |
+| [0024](adr/0024-server-actions-nas-mutacoes.md) | Mutações do navegador ao BFF por Server Actions | aceita |
 
 As decisões que mudam o desenho estão no HLD, seção 10.
 
@@ -405,8 +456,8 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Biblioteca do PDF (WeasyPrint, ReportLab ou fpdf2).
 - [ ] Acesso ao Banco dos agentes e migrações (SQLAlchemy com Alembic, ou SQL cru); com ela, o
       dono do schema desse banco.
-- [ ] Biblioteca de validação das variáveis (zod, Joi, pydantic-settings); com ela, o dono do
-      schema das variáveis.
+- [ ] Biblioteca de validação das variáveis no projeto Python (pydantic-settings ou outra); o dono
+      do schema das variáveis.
 - [ ] Parser da conferência de somente leitura (pglast ou sqlglot).
 - [ ] Biblioteca de log estruturado (pino e structlog, ou o logger de cada framework).
 - [ ] Porquê das escolhas sem motivo registrado: App Router, SWR, FastAPI próprio, uv; ADRs 0017,
@@ -417,22 +468,16 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Tipos de peça e dependências permitidas na API do chat, no Serviço de agentes e no Worker, e
       no `web`, com o diagrama.
 - [ ] Módulos de domínio dos três projetos.
-- [ ] Como o navegador chama o BFF: só Route Handlers (REST), ou Server Actions nas mutações.
 
 **Conceitos transversais**
 
-- [ ] `SameSite` do cookie e defesa contra CSRF.
-- [ ] Formato do identificador de sessão e forma de guardá-lo.
-- [ ] Hash de senha: Argon2id num provider próprio (pacote `argon2`, nativo), ou o scrypt do
-      `PasswordHasher` do `@nestjs/authentication`.
 - [ ] Credenciais de bot (por processo ou por agente) e credencial de serviço.
-- [ ] Chave do limite de tentativas de login (e-mail, IP ou os dois).
-- [ ] Origem do IP atrás do proxy (depende da PaaS, ainda aberta no HLD).
+- [ ] Como o BFF obtém o IP do navegador atrás do proxy (depende da PaaS, ainda aberta no HLD).
 - [ ] Lugar da conferência de participação em canal privado e conversa direta.
 - [ ] Função única que monta a mensagem para cada destinatário.
 - [ ] Onde a transação começa e como passa entre módulos.
 - [ ] Publicação do evento depois do commit: direta ou por tabela de saída.
-- [ ] Quem traduz exceção em resposta.
+- [ ] Quem traduz exceção em resposta no Serviço de agentes.
 - [ ] Campos de correlação dos logs.
 - [ ] O que nunca vai para o log, além do que o HLD já diz.
 - [ ] Contadores quando a leitura avança até uma mensagem que não é a última da conversa.
@@ -443,7 +488,6 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Bots na mesma tabela das pessoas, ou não.
 - [ ] Diagrama de entidades e relações; forma das tabelas.
 - [ ] Paginação do histórico e das listas.
-- [ ] Como o BFF leva a sessão à API do chat.
 - [ ] Índice das rotas (BFF, API do chat para o BFF e para os bots, Serviço de agentes) e lista
       de eventos do WebSocket.
 
@@ -456,7 +500,7 @@ As decisões que mudam o desenho estão no HLD, seção 10.
       "digitando".
 - [ ] Tarefa: concluir uma já concluída, ou reabrir uma aberta.
 - [ ] Idempotência da tarefa do PDF (chave no S3, entrega única) e outras rotinas (retenção dos
-      PDFs, sessões vencidas, perguntas pendentes vencidas).
+      PDFs, perguntas pendentes vencidas).
 
 **Valores, configuração e ambiente**
 

@@ -33,7 +33,7 @@ O ambiente de desenvolvimento usa o `compose.yaml`, na raiz, com quatro serviço
 | Serviço | O que é | Endereço na máquina | Endereço entre contêineres |
 | --- | --- | --- | --- |
 | `web` | Frontend em Next.js | `http://localhost:3000` | `http://web:3000` |
-| `chat-api` | API em NestJS, REST e WebSocket | `http://localhost:3001` | `http://chat-api:3000` |
+| `chat-api` | API em NestJS, REST e WebSocket | `http://localhost:3001` | `http://chat-api:3001` |
 | `postgres` | PostgreSQL, com os bancos `chat`, `agents` e `business` | `localhost:5432` | `postgres:5432` |
 | `s3` | Emulador do S3 (`seaweedfs`) | `http://localhost:8333` | `http://s3:8333` |
 
@@ -83,7 +83,7 @@ Na conexão entre serviços (banco, storage), seja em variável de ambiente, arq
 
 O Figma é a ferramenta de design do projeto, acessada pelo servidor MCP do plugin `figma`.
 
-**Arquivo do Figma:** <https://www.figma.com/design/plW17JDOoRHydUJIIi2u87/slack>
+**Arquivo do Figma:** <https://www.figma.com/design/GXeHfkmxrSH9mGMHTweQSP/slack--Copy->
 
 **Sempre que a tarefa envolver design ou interface, leia antes o `docs/design-system.md`**, seja para desenhar no Figma, seja para implementar uma tela ou um componente no código. Ele define os tokens, os componentes e o fluxo de trabalho com o Figma (sincronia, passos do Figma para o código, assets e validação visual), e as regras dele são obrigatórias.
 

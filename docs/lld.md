@@ -9,7 +9,7 @@
 | Arquitetura, contêineres, integrações e motivos | [HLD](hld.md) |
 | Decisões com porquê | `docs/adr/`, com o índice na seção "Decisões" deste documento e do HLD |
 | Escopo e público | [Product brief](product-brief.md) |
-| Vocabulário | `GLOSSARY.md` na raiz (planejado) |
+| Vocabulário | [GLOSSARY.md](../GLOSSARY.md), na raiz |
 | Linguagem visual (cores, componentes, microtexto) | [Figma](https://www.figma.com/design/plW17JDOoRHydUJIIi2u87/slack) |
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (planejado) |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
@@ -269,7 +269,7 @@ Dois estados: aberta e concluída (HLD 6.6).
 
 ### 6.2 Sessão e login
 
-Regras do PRD da F1-01 ([issue #2](https://github.com/luzardoarruda66/Imersao-FullCycle/issues/2)).
+Regras do [PRD da F1-01](f1-01-entrar/prd.md).
 Os números estão em "Valores e configuração".
 
 - **Entrar.** E-mail sem diferença entre maiúsculas e minúsculas. E-mail inexistente e senha

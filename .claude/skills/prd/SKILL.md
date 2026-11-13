@@ -31,9 +31,15 @@ Gere o documento usando o **Esquema Rígido do PRD** abaixo. Use o vocabulário 
 
 ## Passo 4: Publicação
 
-Depois que o usuário aprovar o rascunho, publique o PRD no issue tracker do projeto, em vez de deixá-lo só na conversa ou num arquivo. Aplique o rótulo de triagem `ready-for-agent`, sem precisar de outra triagem.
+Depois que o usuário aprovar o rascunho:
 
-NÃO inclua caminhos de arquivo nem trechos de código específicos no PRD publicado. Eles podem ficar desatualizados muito rápido.
+1. Grave o PRD em `docs/<id>-<nome-da-funcionalidade>/prd.md`, com o ID e o nome da funcionalidade no roadmap em minúsculas e com hífens (por exemplo, `docs/f1-01-entrar/prd.md`). O arquivo entra no mesmo PR que reflete o PRD nos outros documentos.
+2. Publique o mesmo texto no issue tracker do projeto, com o rótulo de triagem `ready-for-agent`, sem precisar de outra triagem.
+3. Na linha da funcionalidade no roadmap, a coluna Plano aponta para o arquivo e para a issue.
+
+Pronto quando o arquivo existe no branch do PR, a issue está publicada e o roadmap aponta para os dois.
+
+Cite só caminhos de documentos (`docs/...`) no PRD; caminhos de código e trechos de código ficam desatualizados muito rápido.
 
 ---
 

@@ -229,7 +229,18 @@ Nada de testar a implementação (chamadas internas, consultas geradas).
      as sessões;
    - corpo de erro único, inclusive para rota inexistente e JSON malformado.
    Prior art: `apps/chat-api/test/app.e2e-spec.ts` (esqueleto com Supertest e Vitest).
-2. **E2E de navegador com Playwright**, no serviço `e2e`, contra o `web` e a `chat-api` de pé. Cobre
+2. **Unitário e de componente no `web`, com Vitest e React Testing Library** (LLD, seção 1; montagem
+   em `.claude/rules/nextjs.md`, "Testes"). Cobre o que não precisa de navegador nem da API:
+   - a validação do destino guardado (`/caminho` aceito; `//`, `/\`, URL absoluta e vazio levam a
+     `/`);
+   - os schemas Zod das Server Actions (e-mail malformado, campos em branco, confirmação diferente
+     da nova senha);
+   - a tradução das respostas da API do chat (`sessao_invalida`, `tentativas_demais` com os
+     segundos, falha de rede e 5xx);
+   - os estados dos componentes de cliente do formulário de entrar e do diálogo de troca,
+     buscados pelo papel e pelo nome acessível.
+   Não há prior art no `web`; esta entrega cria o primeiro.
+3. **E2E de navegador com Playwright**, no serviço `e2e`, contra o `web` e a `chat-api` de pé. Cobre
    o que só o navegador prova: link guardado e volta a ele, destino externo recusado, segunda aba
    já com sessão, sair derrubando a outra aba na próxima ação, cookie que ficou para trás sem laço,
    porta "Erro de sessão" com a API parada, os estados do Login e do diálogo de troca, uso só por

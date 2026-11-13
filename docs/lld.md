@@ -71,6 +71,7 @@ docs/             HLD, LLD, ADRs, brief
 | Parser da conferência de somente leitura | A definir | — |
 | Log estruturado | A definir | — |
 | Testes de navegador | Playwright | A imagem oficial roda num contêiner próprio, sem instalar navegador nas imagens das apps (seção "Ambiente de desenvolvimento") |
+| Testes unitários e de componente do `web` | Vitest, React Testing Library e jsdom | Recomendação do guia de testes do Next 16.4, e o mesmo runner da API do chat. O Vitest não renderiza Server Components `async`; esses e os fluxos entre telas ficam com o Playwright |
 
 ## 2. Componentes e dependências
 
@@ -415,7 +416,8 @@ O que substitui cada serviço de produção está no HLD, seção 9, "Implantaç
   host, e só o contêiner instala ou adiciona dependências: rodar o pnpm também no host faz os
   dois lados disputarem a mesma pasta.
 - **Testes:** os testes E2E da API do chat usam um banco `chat_test`, que o setup dos testes
-  cria e migra. Os testes de navegador rodam num serviço `e2e` do Compose, com a imagem oficial
+  cria e migra. Os testes unitários e de componente do `web` rodam no próprio contêiner `web`,
+  sem navegador. Os testes de navegador rodam num serviço `e2e` do Compose, com a imagem oficial
   do Playwright, atrás de um `profile` para não subir por padrão.
 - **Bancos e usuários:** uma instância de Postgres com os três bancos, criados na primeira subida
   por `docker/postgres/init.sql`.

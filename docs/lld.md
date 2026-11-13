@@ -1,6 +1,6 @@
 # LLD — Full Cycle Chat
 
-2026-11-12 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
+2026-11-13 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
 
 **Onde mora cada fato**
 
@@ -254,9 +254,9 @@ de eventos do WebSocket estão a definir. O único comportamento já decidido:
 
 ## 6. Estados e regras
 
-As subseções desta parte (pedido ao agente, pergunta pendente, mensagem, sessão e login, consulta
-a dados de negócio, limite de pedidos e teto de custo) e as regras de cada uma estão a definir. A
-regra já decidida fica abaixo.
+As subseções desta parte (pedido ao agente, pergunta pendente, mensagem, consulta a dados de
+negócio, limite de pedidos e teto de custo) e as regras de cada uma estão a definir. As regras já
+decididas ficam abaixo.
 
 ### 6.1 Tarefa
 
@@ -266,6 +266,25 @@ Dois estados: aberta e concluída (HLD 6.6).
   erro do catálogo.
 - Ao concluir ou reabrir, quem delegou é avisado (HLD 6.6).
 - Concluir uma tarefa já concluída, ou reabrir uma aberta: a definir.
+
+### 6.2 Sessão e login
+
+Regras do PRD da F1-01 ([issue #2](https://github.com/luzardoarruda66/Imersao-FullCycle/issues/2)).
+Os números estão em "Valores e configuração".
+
+- **Entrar.** E-mail sem diferença entre maiúsculas e minúsculas. E-mail inexistente e senha
+  errada recebem a mesma resposta, para não revelar quem tem conta.
+- **Limite de tentativas.** Depois de `tentativas de login e janela` erradas seguidas, a entrada
+  fica recusada durante a espera, inclusive com a senha certa, e a resposta diz quanto tempo falta.
+  A espera termina sozinha; não há bloqueio permanente da conta.
+- **Validade.** A sessão vence depois da `duração da sessão` sem uso; cada requisição ou conexão
+  autenticada renova o prazo.
+- **Sair.** Apaga a sessão no Banco do chat (HLD 6.1). As outras sessões da pessoa continuam.
+- **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
+  `regra da senha`. Depois da troca, a sessão atual continua e as outras sessões da pessoa são
+  apagadas.
+- **Operação.** Encerrar as sessões de uma pessoa, ou redefinir a senha dela, pelo comando da API
+  do chat, apaga todas as sessões dela.
 
 ## 7. Processos de segundo plano
 
@@ -283,6 +302,7 @@ sessões vencidas, perguntas pendentes vencidas) estão a definir.
 | Rota | Acesso | Lê | Ações | Situação |
 | --- | --- | --- | --- | --- |
 | A definir | Público | — | Entrar com e-mail e senha | a detalhar |
+| A definir | Sessão | — | Trocar a própria senha; sair | a detalhar |
 | A definir | Sessão | Histórico da conversa | Enviar, editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Conversas, com não lidas e menções | Abrir conversa | a detalhar |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
@@ -299,6 +319,8 @@ atualiza esse cache direto, sem nova requisição.
 
 - O proxy do Next (`src/proxy.ts`, o antigo middleware) confere só se o cookie de sessão existe;
   sem ele, manda para "Entrar". A validação de verdade é da API do chat.
+- Ao mandar para "Entrar", guarda o caminho pedido e volta a ele depois de entrar. Só caminhos do
+  próprio produto são aceitos; qualquer outro destino vai para a tela principal.
 - Qualquer 401 vindo do BFF manda para "Entrar".
 - Um 401 no WebSocket fecha a conexão e manda para "Entrar".
 
@@ -321,8 +343,9 @@ atualiza esse cache direto, sem nova requisição.
 | Teto de custo por pedido | A definir | Serviço de agentes | A definir |
 | Tentativas do Worker | A definir | Worker | A definir |
 | Validade da URL do PDF | A definir | API do chat | A definir |
-| Duração da sessão | A definir | API do chat | A definir |
-| Tentativas de login e janela | A definir | API do chat | A definir |
+| Duração da sessão | 30 dias sem uso (PRD da F1-01) | API do chat | A definir |
+| Tentativas de login e janela | 5 erradas seguidas; espera de 15 minutos (PRD da F1-01) | API do chat | A definir |
+| Regra da senha | Mínimo de 8 caracteres, com uma maiúscula, uma minúscula, um número e um símbolo (PRD da F1-01) | API do chat | A definir |
 | Validade do identificador de pedido | A definir | API do chat | A definir |
 | Retenção dos eventos de reconexão | A definir | API do chat (Redis) | A definir |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
@@ -428,7 +451,7 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 
 - [ ] Subseções de "Estados e regras": pedido ao agente (estados; resposta a uma pergunta como
       pedido novo ou continuação), pergunta pendente (quando termina), mensagem (exclusão com
-      menções, notificações e contadores; edição que acrescenta menção), sessão e login, consulta
+      menções, notificações e contadores; edição que acrescenta menção), consulta
       a dados de negócio (comparação do lastro), limite de pedidos e teto de custo, presença e
       "digitando".
 - [ ] Tarefa: concluir uma já concluída, ou reabrir uma aberta.

@@ -76,7 +76,7 @@ Hipóteses em que a aposta se apoia, ainda não validadas:
 Plataforma: web, no navegador de desktop.
 
 1. Entrar com e-mail e senha, em uma conta criada pela empresa; a sessão vale para o navegador
-   todo.
+   todo. Depois de entrar, a pessoa pode trocar a própria senha.
 2. Conversar nos canais públicos (que incluem todo o workspace), em canais privados e em conversas
    diretas (1:1); criar canais públicos ou privados e convidar pessoas para um canal privado.
    Só quem foi convidado vê e participa do canal privado.

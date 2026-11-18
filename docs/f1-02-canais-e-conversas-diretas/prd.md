@@ -30,20 +30,20 @@ Funcionalidade F1-02 do roadmap (`docs/roadmap.md`, Fase 1), item 2 do "Escopo d
 
 - Todo membro vê e participa de todos os canais públicos, sem convite.
 - Ao enviar uma mensagem, ela aparece na conversa com autor e horário.
-- Mensagem vazia ou só de espaços não é enviada.
+- Mensagem vazia ou só de espaços não é enviada, e mensagem com mais de 4.000 caracteres é recusada com aviso.
 - O envio funciona por teclado, com a tecla Enter.
 
 **H2. Como membro, quero criar um canal público ou privado para organizar um assunto.**
 
 - Criar pede um nome e a escolha entre público e privado.
 - O canal criado aparece na lista de quem pode vê-lo: todos, no público; só o criador, no privado.
-- Nome vazio é recusado com mensagem. Nome repetido é recusado: A definir se a unicidade compara maiúsculas e minúsculas.
-- Limite de tamanho do nome: A definir.
+- Nome vazio é recusado com mensagem. Nome repetido é recusado, sem diferenciar maiúsculas e minúsculas e ignorando espaços nas pontas.
+- O nome tem de 1 a 80 caracteres.
 
 **H3. Como membro, quero convidar pessoas para um canal privado para que só quem precisa participe.**
 
-- Qualquer membro de um canal privado pode convidar outros membros: A definir se só o criador convida.
-- O convidado passa a ver o canal e a escrever nele; se vê as mensagens anteriores ao convite: A definir.
+- Qualquer membro de um canal privado pode convidar outros membros.
+- O convidado passa a ver o canal e a escrever nele; vê também as mensagens anteriores ao convite.
 - Convidar quem já participa não duplica nem dá erro técnico.
 
 **H4. Como membro, quero que canal privado seja invisível a quem não foi convidado para ter confidencialidade.**
@@ -57,8 +57,8 @@ Funcionalidade F1-02 do roadmap (`docs/roadmap.md`, Fase 1), item 2 do "Escopo d
 
 - A conversa direta existe entre dois membros e só os dois a veem e escrevem nela.
 - Abrir uma conversa direta com quem já tem uma conversa direta com o membro leva à existente, sem criar outra.
-- Para escolher com quem abrir, esta funcionalidade oferece a lista de membros; a busca por nome ou @usuário e o perfil ficam na F1-03.
-- Conversa direta consigo mesmo: A definir.
+- Para escolher com quem abrir, esta funcionalidade oferece a lista de membros; a busca por nome ou @usuário e o perfil ficam na F1-03. A lista mostra só o nome.
+- Abrir conversa direta consigo mesmo é recusado.
 
 **H6. Como membro, quero ver a lista das minhas conversas para ir de uma a outra.**
 

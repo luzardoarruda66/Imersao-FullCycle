@@ -1,6 +1,6 @@
 # LLD — Full Cycle Chat
 
-2026-11-13 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
+2026-11-18 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
 
 **Onde mora cada fato**
 
@@ -144,8 +144,10 @@ novas tentativas e idempotência").
   nesse cabeçalho só quando a chamada vem da rede interna (`trust proxy` restrito). Como o BFF
   obtém o IP atrás do proxy da PaaS está a definir, porque depende da PaaS escolhida (HLD,
   seção 12).
-- **Participação em canal privado e conversa direta:** o lugar no código onde a API do chat a
-  confere está a definir.
+- **Participação em canal privado e conversa direta:** um serviço só, no módulo de conversas, a
+  confere, e toda rota que lê ou escreve numa conversa o chama (o WebSocket o usa quando a FD-03
+  chegar). Quem não participa recebe a mesma resposta de uma conversa que não existe, para que a
+  resposta não revele que o canal privado existe. Canal público não exige convite.
 - **Credenciais de bot e de serviço:** a forma (um segredo por processo ou por agente) está a
   definir. Toda ação de bot leva o identificador de pedido
   ([ADR 0011](adr/0011-identificador-de-pedido.md)).
@@ -239,8 +241,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 | Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | planejada |
 | Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | planejada |
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | planejada |
-| Chat | Canais e membros | a detalhar |
-| Chat | Conversas diretas | a detalhar |
+| Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes. Nome do canal único sem diferenciar maiúsculas; um par de membros só tem uma conversa direta | a detalhar |
 | Chat | Mensagens (autor pessoa ou bot, citação, marca "dados de negócio") | a detalhar |
 | Chat | Menções | a detalhar |
 | Chat | Última leitura e contadores por pessoa e conversa | a detalhar |
@@ -396,7 +397,10 @@ atualiza esse cache direto, sem nova requisição.
 | Validade do identificador de pedido | A definir | API do chat | A definir |
 | Retenção dos eventos de reconexão | A definir | API do chat (Redis) | A definir |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
-| Tamanho da página do histórico | A definir | API do chat | A definir |
+| Tamanho da página do histórico | A definir (F1-04) | API do chat | A definir |
+| Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | A definir |
+| Tamanho do nome do canal | 1 a 80 caracteres | API do chat | A definir |
+| Tamanho da mensagem | Até 4.000 caracteres | API do chat | A definir |
 
 **Variáveis de ambiente**
 
@@ -475,7 +479,6 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 
 - [ ] Credenciais de bot (por processo ou por agente) e credencial de serviço.
 - [ ] Como o BFF obtém o IP do navegador atrás do proxy (depende da PaaS, ainda aberta no HLD).
-- [ ] Lugar da conferência de participação em canal privado e conversa direta.
 - [ ] Função única que monta a mensagem para cada destinatário.
 - [ ] Onde a transação começa e como passa entre módulos.
 - [ ] Publicação do evento depois do commit: direta ou por tabela de saída.
@@ -486,10 +489,9 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 
 **Dados e interfaces**
 
-- [ ] Canais e conversas diretas: uma tabela com tipo, ou tabelas separadas.
 - [ ] Bots na mesma tabela das pessoas, ou não.
 - [ ] Diagrama de entidades e relações; forma das tabelas.
-- [ ] Paginação do histórico e das listas.
+- [ ] Paginação do histórico e das listas (a F1-02 devolve as 50 mais recentes; o cursor é da F1-04).
 - [ ] Índice das rotas (BFF, API do chat para o BFF e para os bots, Serviço de agentes) e lista
       de eventos do WebSocket.
 

@@ -11,14 +11,14 @@
 | Escopo e público | [Product brief](product-brief.md) |
 | Vocabulário | [GLOSSARY.md](../GLOSSARY.md), na raiz |
 | Linguagem visual (cores, componentes, microtexto) | [Figma](https://www.figma.com/design/GXeHfkmxrSH9mGMHTweQSP/slack--Copy-) |
-| Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (planejado) |
+| Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
-| Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (planejado) |
+| Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
 | Eventos do WebSocket | Tipos TypeScript em `packages/chat-events/` (planejado) |
-| Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM (planejado) |
+| Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
-| Schema das variáveis de ambiente | A definir |
+| Schema das variáveis de ambiente | `apps/chat-api/src/config/env.ts` e `apps/web/src/server/config.ts` (Zod), com `apps/chat-api/.env.example`; os outros projetos, a definir |
 | Práticas e comandos | `apps/*/AGENTS.md`, um por app (`web` e `chat-api` existem; `agents` planejado), apontados pelo `AGENTS.md` da raiz (planejado); as regras de framework ficam em `.claude/rules/`, apontadas por esses arquivos |
 
 Os snapshots OpenAPI ficam gravados no repositório, e a CI falha quando o código muda o contrato
@@ -37,7 +37,7 @@ apps/
   web/            Frontend/BFF (Next.js)                              existe
   chat-api/       API do chat (NestJS): REST, WebSocket e o comando   existe
                   de contas e permissões (HLD, seção 2)
-    migrations/   migrações do Banco do chat                          planejada
+    migrations/   migrações do Banco do chat                          existe
   agents/         Serviço de agentes e Worker (Python + ADK),         planejada
                   dois processos do mesmo projeto
     scripts/      script de carga do Banco de negócio                 planejada
@@ -238,9 +238,9 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 
 | Banco | Entidade (HLD, seção 7) | Situação |
 | --- | --- | --- |
-| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | planejada |
-| Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | planejada |
-| Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | planejada |
+| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | existe |
+| Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | existe |
+| Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
 | Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes. Nome do canal único sem diferenciar maiúsculas; um par de membros só tem uma conversa direta | a detalhar |
 | Chat | Mensagens (autor pessoa ou bot, citação, marca "dados de negócio") | a detalhar |
 | Chat | Menções | a detalhar |
@@ -281,10 +281,10 @@ de eventos do WebSocket estão a definir. O único comportamento já decidido:
 | Método e caminho | Situação | Comportamento |
 | --- | --- | --- |
 | Envio de mensagem no BFF (caminho a definir) | a detalhar | Mensagem gravada e agente sem receber o pedido: "Conceitos transversais de implementação", seção "Erros" |
-| `POST /v1/sessoes` (API do chat) | planejada | Entrar: "Sessão e login". Erros: `credenciais_invalidas` (401), `tentativas_demais` (429, com `details.segundos_restantes`), `dados_invalidos` (400) |
-| `DELETE /v1/sessoes/atual` (API do chat) | planejada | Sair: apaga a sessão do cookie e devolve o `Set-Cookie` que o expira |
-| `GET /v1/eu` (API do chat) | planejada | O membro da sessão. Sem sessão válida: `sessao_invalida` (401), código de toda rota com sessão |
-| `PUT /v1/eu/senha` (API do chat) | planejada | Trocar a senha: "Sessão e login". Erros: `senha_atual_incorreta` (422), `senha_fraca` (422, com `details.regras_faltando`) |
+| `POST /v1/sessoes` (API do chat) | existe | Entrar: "Sessão e login". Erros: `credenciais_invalidas` (401), `tentativas_demais` (429, com `details.segundos_restantes`), `dados_invalidos` (400) |
+| `DELETE /v1/sessoes/atual` (API do chat) | existe | Sair: apaga a sessão do cookie e devolve o `Set-Cookie` que o expira |
+| `GET /v1/eu` (API do chat) | existe | O membro da sessão. Sem sessão válida: `sessao_invalida` (401), código de toda rota com sessão |
+| `PUT /v1/eu/senha` (API do chat) | existe | Trocar a senha: "Sessão e login". Erros: `senha_atual_incorreta` (422), `senha_fraca` (422, com `details.regras_faltando`) |
 
 ## 6. Estados e regras
 
@@ -341,8 +341,8 @@ definir.
 
 | Rota | Acesso | Lê | Ações | Situação |
 | --- | --- | --- | --- | --- |
-| `/entrar` | Público | — | Entrar com e-mail e senha | planejada |
-| `/` (casca: Rail e menu do usuário) | Sessão | O membro da sessão | Trocar a própria senha, num diálogo; sair | planejada |
+| `/entrar` | Público | — | Entrar com e-mail e senha | existe |
+| `/` (casca: Rail e menu do usuário) | Sessão | O membro da sessão | Trocar a própria senha, num diálogo; sair | existe |
 | A definir | Sessão | Histórico da conversa | Enviar, editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Conversas, com não lidas e menções | Abrir conversa | a detalhar |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
@@ -390,10 +390,10 @@ atualiza esse cache direto, sem nova requisição.
 | Teto de custo por pedido | A definir | Serviço de agentes | A definir |
 | Tentativas do Worker | A definir | Worker | A definir |
 | Validade da URL do PDF | A definir | API do chat | A definir |
-| Duração da sessão | 30 dias sem uso (PRD da F1-01) | API do chat | A definir |
-| Tentativas de login e janela | 5 erradas seguidas; espera de 15 minutos (PRD da F1-01) | API do chat | A definir |
-| Teto de tentativas de entrar por IP | 30 em 15 minutos | API do chat | A definir |
-| Regra da senha | Mínimo de 8 caracteres, com uma maiúscula, uma minúscula, um número e um símbolo (PRD da F1-01) | API do chat | A definir |
+| Duração da sessão | 30 dias sem uso (PRD da F1-01) | API do chat | Constante `SESSION_DURATION`, em `apps/chat-api/src/config/values.ts` |
+| Tentativas de login e janela | 5 erradas seguidas; espera de 15 minutos (PRD da F1-01) | API do chat | Constantes `LOGIN_MAX_FAILURES` e `LOGIN_WAIT_MS`, no mesmo arquivo |
+| Teto de tentativas de entrar por IP | 30 em 15 minutos | API do chat | Constantes `LOGIN_IP_CEILING` e `LOGIN_IP_CEILING_WINDOW_MS`, no mesmo arquivo |
+| Regra da senha | Mínimo de 8 caracteres, com uma maiúscula, uma minúscula, um número e um símbolo (PRD da F1-01) | API do chat | Função `missingPasswordRules`, em `apps/chat-api/src/accounts/password-rule.ts` |
 | Validade do identificador de pedido | A definir | API do chat | A definir |
 | Retenção dos eventos de reconexão | A definir | API do chat (Redis) | A definir |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
@@ -404,14 +404,14 @@ atualiza esse cache direto, sem nova requisição.
 
 **Variáveis de ambiente**
 
-A definir. O que cada contêiner recebe está no HLD, seção 8, "Configuração e segredos".
+A lista, o tipo e o padrão de cada variável da API do chat e do `web` estão nos schemas Zod apontados em "Onde mora cada fato". O que cada contêiner recebe está no HLD, seção 8, "Configuração e segredos".
 
 ## 10. Ambiente de desenvolvimento
 
 O que substitui cada serviço de produção está no HLD, seção 9, "Implantação e ambientes". O
 `compose.yaml` da raiz sobe os serviços; os comandos estão no `AGENTS.md` de cada app.
 
-- **Serviços presentes:** `web`, `chat-api`, Postgres e o substituto do S3 (SeaweedFS). O Redis, o
+- **Serviços presentes:** `web`, `chat-api`, Postgres, o substituto do S3 (SeaweedFS) e o `e2e` (atrás do `profile` `e2e`). O Redis, o
   Serviço de agentes e o Worker entram com o projeto `agents`; até lá, nenhum código do `web` ou
   do `chat-api` pode exigir o Redis para subir localmente.
 - **Contêiner das apps:** a imagem não guarda dependências. O repositório inteiro é montado em
@@ -422,7 +422,7 @@ O que substitui cada serviço de produção está no HLD, seção 9, "Implantaç
 - **Testes:** os testes E2E da API do chat usam um banco `chat_test`, que o setup dos testes
   cria e migra. Os testes unitários e de componente do `web` rodam no próprio contêiner `web`,
   sem navegador. Os testes de navegador rodam num serviço `e2e` do Compose, com a imagem oficial
-  do Playwright, atrás de um `profile` para não subir por padrão.
+  do Playwright, atrás de um `profile` para não subir por padrão; `scripts/e2e.sh` cria as contas de teste com o comando `contas`, roda a suíte e, num segundo passo, para a `chat-api` para provar a porta "Erro de sessão".
 - **Bancos e usuários:** uma instância de Postgres com os três bancos, criados na primeira subida
   por `docker/postgres/init.sql`.
 

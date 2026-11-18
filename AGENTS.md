@@ -73,6 +73,10 @@ docker compose -f compose.yaml logs chat-api
 
 Depois do conserto, rode a instalação de novo no contêiner, com `docker compose -f compose.yaml exec chat-api pnpm install`.
 
+### Testes de navegador
+
+O serviço `e2e` (imagem oficial do Playwright) fica atrás do `profile` `e2e` e não sobe por padrão. Rode `./scripts/e2e.sh`; o detalhe está no `apps/web/AGENTS.md`.
+
 ### Rede entre serviços
 
 Na conexão entre serviços (banco, storage), seja em variável de ambiente, arquivo de configuração ou código, **o host é sempre o nome do serviço do Compose**, como na coluna "Endereço entre contêineres" da tabela, e nunca `localhost` nem `127.0.0.1`: dentro de um contêiner, `localhost` é o próprio contêiner.

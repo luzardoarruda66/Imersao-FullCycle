@@ -13,7 +13,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main",
     "lint": "oxlint --type-aware src/ test/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,8 +23,8 @@
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/database/data-source.ts",
     "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/database/data-source.ts",
     "migration:check": "tsx ./node_modules/typeorm/cli.js migration:generate migrations/Check -d src/database/data-source.ts --check",
-    "contas": "tsx src/cli/contas.ts",
-    "openapi": "tsx src/openapi/generate.ts"
+    "contas": "nest build && node dist/src/cli/contas.js",
+    "openapi": "nest build && node dist/src/openapi/generate.js"
   },
   "dependencies": {
     "@nestjs/authentication": "^0.1.6",

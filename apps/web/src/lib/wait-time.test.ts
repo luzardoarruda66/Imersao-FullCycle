@@ -12,7 +12,11 @@ describe("formatWait", () => {
 
 describe("missingRulesMessage", () => {
   it("lista exatamente as regras que faltaram", () => {
-    expect(missingRulesMessage(["maiuscula", "simbolo"])).toBe("Inclua uma letra maiúscula. Inclua um símbolo.");
+    expect(missingRulesMessage(["numero", "simbolo"])).toBe("Falta: um número e um símbolo.");
+    expect(missingRulesMessage(["minimo_8_caracteres", "maiuscula", "simbolo"])).toBe(
+      "Falta: pelo menos 8 caracteres, uma letra maiúscula e um símbolo.",
+    );
+    expect(missingRulesMessage(["numero"])).toBe("Falta: um número.");
   });
   it("tem uma mensagem de reserva", () => {
     expect(missingRulesMessage(undefined)).toBe("A nova senha não cumpre a regra.");

@@ -9,11 +9,11 @@ describe("signInSchema", () => {
   it("recusa campos em branco e e-mail malformado, com a mensagem de cada campo", () => {
     const blank = signInSchema.safeParse({ email: " ", senha: "" });
     expect(!blank.success && fieldErrorsOf(blank.error)).toEqual({
-      email: "Informe o e-mail.",
-      senha: "Informe a senha.",
+      email: "Informe um e-mail válido, como nome@empresa.com.",
+      senha: "Informe sua senha.",
     });
     const malformed = signInSchema.safeParse({ email: "ana@", senha: "x" });
-    expect(!malformed.success && fieldErrorsOf(malformed.error)).toEqual({ email: "Informe um e-mail válido." });
+    expect(!malformed.success && fieldErrorsOf(malformed.error)).toEqual({ email: "Informe um e-mail válido, como nome@empresa.com." });
   });
 });
 

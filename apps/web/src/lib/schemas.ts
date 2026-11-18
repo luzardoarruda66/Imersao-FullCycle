@@ -1,13 +1,15 @@
 import { z } from "zod";
 
+const EMAIL_MESSAGE = "Informe um e-mail válido, como nome@empresa.com.";
+
 /** Entrada das Server Actions, validada antes de chamar a API do chat (ADR 0024). */
 export const signInSchema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, "Informe o e-mail.")
-    .pipe(z.email("Informe um e-mail válido.")),
-  senha: z.string().min(1, "Informe a senha."),
+    .min(1, EMAIL_MESSAGE)
+    .pipe(z.email(EMAIL_MESSAGE)),
+  senha: z.string().min(1, "Informe sua senha."),
 });
 
 export const changePasswordSchema = z

@@ -28,6 +28,10 @@ services:
     working_dir: /workspace/apps/web
     volumes:
       - .:/workspace
+    environment:
+      # Endereço da API do chat entre contêineres (AGENTS.md da raiz, "Rede entre serviços").
+      CHAT_API_URL: http://chat-api:3001
+      COOKIE_DOMAIN: ""
     ports:
       - "3000:3000"
     depends_on:

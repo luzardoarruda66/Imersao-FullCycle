@@ -1,4 +1,14 @@
-import { safeNext } from "./safe-redirect";
+import { entrarPath, safeNext } from "./safe-redirect";
+
+describe("entrarPath", () => {
+  it("guarda o destino pedido na URL de Entrar", () => {
+    expect(entrarPath("/c/1?m=2")).toBe("/entrar?para=%2Fc%2F1%3Fm%3D2");
+  });
+  it("sem destino, ou com destino inseguro, vai só para Entrar", () => {
+    expect(entrarPath("/")).toBe("/entrar");
+    expect(entrarPath("//outro.com")).toBe("/entrar");
+  });
+});
 
 describe("safeNext", () => {
   it("aceita um caminho do produto, com query e hash", () => {

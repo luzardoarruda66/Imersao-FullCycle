@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { safeNext } from "@/lib/safe-redirect";
+import { entrarPath } from "@/lib/safe-redirect";
 import { clearSessionCookie } from "@/server/chat-api";
 
 /**
@@ -8,8 +8,7 @@ import { clearSessionCookie } from "@/server/chat-api";
  */
 export async function GET(request: NextRequest) {
   await clearSessionCookie();
-  const wanted = safeNext(request.nextUrl.searchParams.get("para"));
   // Redirecionamento relativo: atrás do contêiner o servidor escuta em 0.0.0.0, e a URL absoluta sairia com esse host.
-  const location = wanted === "/" ? "/entrar" : `/entrar?para=${encodeURIComponent(wanted)}`;
+  const location = entrarPath(request.nextUrl.searchParams.get("para") ?? "/");
   return new NextResponse(null, { status: 307, headers: { Location: location } });
 }

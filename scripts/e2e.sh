@@ -23,5 +23,6 @@ $COMPOSE --profile e2e run --rm -e E2E_ACCOUNTS="$accounts" e2e npx playwright t
 
 # A `chat-api` parada prova a porta "Erro de sessão".
 $COMPOSE stop chat-api
-trap '$COMPOSE start chat-api >/dev/null' EXIT
+# Religa a API e o servidor de desenvolvimento dela, que parou junto com o contêiner.
+trap '$COMPOSE start chat-api >/dev/null && $COMPOSE exec -d chat-api pnpm start:dev' EXIT
 $COMPOSE --profile e2e run --rm -e E2E_ACCOUNTS="$accounts" e2e npx playwright test --project=api-parada "$@"

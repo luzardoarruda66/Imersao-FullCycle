@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session-cookie";
+import { entrarPath } from "@/lib/safe-redirect";
 
 /**
  * Confere só se o cookie de sessão existe; sem ele, manda para "Entrar" guardando o caminho pedido
@@ -8,10 +9,9 @@ import { SESSION_COOKIE } from "@/lib/session-cookie";
 export function proxy(request: NextRequest) {
   if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
   const url = request.nextUrl.clone();
-  const wanted = request.nextUrl.pathname + request.nextUrl.search;
-  url.pathname = "/entrar";
-  url.search = "";
-  if (wanted !== "/") url.searchParams.set("para", wanted);
+  const [pathname, search = ""] = entrarPath(request.nextUrl.pathname + request.nextUrl.search).split("?");
+  url.pathname = pathname!;
+  url.search = search;
   return NextResponse.redirect(url);
 }
 

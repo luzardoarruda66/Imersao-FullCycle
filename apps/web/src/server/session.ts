@@ -1,6 +1,5 @@
 import "server-only";
 import { cookies } from "next/headers";
-import type { ApiResult } from "@/lib/chat-api-response";
 import { callChatApi } from "./chat-api";
 import { SESSION_COOKIE } from "@/lib/session-cookie";
 
@@ -21,7 +20,7 @@ export type SessionState =
 export async function getSessionState(): Promise<SessionState> {
   const jar = await cookies();
   if (!jar.get(SESSION_COOKIE)) return { kind: "none" };
-  const result: ApiResult<Member> = await callChatApi<Member>("/v1/eu");
+  const result = await callChatApi<Member>("/v1/eu");
   if (result.kind === "ok") return { kind: "member", member: result.data };
   if (result.kind === "unavailable") return { kind: "unavailable" };
   return { kind: "none" };

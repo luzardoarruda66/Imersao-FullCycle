@@ -7,6 +7,7 @@ import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { PeopleService } from '../../src/accounts/people.service.js';
 import { Clock } from '../../src/clock.js';
+import { SESSION_COOKIE_NAME } from '../../src/config/values.js';
 
 export class TestClock extends Clock {
   private current = Date.now();
@@ -57,7 +58,7 @@ export async function createTestApp(): Promise<TestApp> {
 export function sidFrom(response: { headers: Record<string, unknown> }): string | undefined {
   const raw = response.headers['set-cookie'] as string[] | string | undefined;
   const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const header = list.find((cookie) => cookie.startsWith('sid='));
+  const header = list.find((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}=`));
   const pair = header?.split(';')[0];
-  return pair && pair !== 'sid=' ? pair : undefined;
+  return pair && pair !== `${SESSION_COOKIE_NAME}=` ? pair : undefined;
 }

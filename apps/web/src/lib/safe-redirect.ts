@@ -1,3 +1,9 @@
+/** Caminho de "Entrar" guardando o destino pedido (`/entrar?para=/caminho`); sem destino, só `/entrar`. */
+export function entrarPath(wanted: string): string {
+  const next = safeNext(wanted);
+  return next === "/" ? "/entrar" : `/entrar?para=${encodeURIComponent(next)}`;
+}
+
 /**
  * Destino guardado depois de entrar (LLD, seção 8, "Sessão no cliente"): só vale um caminho do próprio
  * produto, que começa com uma `/` e não com `//` nem `/\`. Qualquer outro vai para a tela principal.

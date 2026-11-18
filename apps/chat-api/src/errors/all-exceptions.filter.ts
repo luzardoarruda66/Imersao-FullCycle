@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { ThrottlerException } from '@nestjs/throttler';
+import { LOGIN_IP_CEILING_WINDOW_MS } from '../config/values.js';
 import { AppError, type ErrorCode } from './app-error.js';
 
 const BY_STATUS: Record<number, [ErrorCode, string]> = {
@@ -30,12 +31,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return { status: exception.getStatus(), code: exception.code, message: exception.message, details: exception.details };
     }
     if (exception instanceof ThrottlerException) {
-      const retryAfter = Number(httpAdapter.getHeader(response, 'retry-after'));
+      const header = Number(httpAdapter.getHeader(response, 'retry-after'));
+      // Sem `Retry-After`, vale a janela inteira do teto por IP.
+      const seconds = Number.isFinite(header) && header > 0 ? header : LOGIN_IP_CEILING_WINDOW_MS / 1000;
+      this.logger.warn(`Tentativa de entrar bloqueada pelo teto por IP: segundos_restantes=${seconds}`);
       return {
         status: HttpStatus.TOO_MANY_REQUESTS,
         code: 'tentativas_demais' as const,
         message: 'Tentativas demais. Tente de novo mais tarde.',
-        details: Number.isFinite(retryAfter) && retryAfter > 0 ? { segundos_restantes: retryAfter } : undefined,
+        details: { segundos_restantes: seconds },
       };
     }
     if (exception instanceof HttpException) {

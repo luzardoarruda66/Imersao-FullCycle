@@ -22,6 +22,7 @@ export async function getSessionState(): Promise<SessionState> {
   if (!jar.get(SESSION_COOKIE)) return { kind: "none" };
   const result = await callChatApi<Member>("/v1/eu");
   if (result.kind === "ok") return { kind: "member", member: result.data };
-  if (result.kind === "unavailable") return { kind: "unavailable" };
-  return { kind: "none" };
+  // Só o 401 (`sessao_invalida`) derruba a sessão; qualquer outra falha é da API, e uma queda não tira ninguém da sessão.
+  if (result.kind === "invalid-session") return { kind: "none" };
+  return { kind: "unavailable" };
 }

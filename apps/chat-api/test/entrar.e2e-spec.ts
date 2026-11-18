@@ -143,12 +143,11 @@ describe('Entrar, sessão e trocar a senha (e2e HTTP)', () => {
       });
 
       it('o teto por IP recusa a 31ª tentativa, mesmo com e-mails diferentes', async () => {
-        let status = 0;
-        for (let i = 0; i < 31; i++) {
-          const res = await signIn({ email: `pessoa${i}@empresa.com`, senha: 'x' }, '10.0.0.5');
-          status = res.status;
-        }
-        expect(status).toBe(429);
+        let last: Awaited<ReturnType<typeof signIn>> | undefined;
+        for (let i = 0; i < 31; i++) last = await signIn({ email: `pessoa${i}@empresa.com`, senha: 'x' }, '10.0.0.5');
+        expect(last!.status).toBe(429);
+        expect(last!.body.error.code).toBe('tentativas_demais');
+        expect(last!.body.error.details.segundos_restantes).toBeGreaterThan(0);
       });
     });
   });

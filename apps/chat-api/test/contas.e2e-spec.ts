@@ -69,6 +69,12 @@ describe('Comando contas (e2e)', () => {
     }
   });
 
+  it('criar recusa e-mail malformado', async () => {
+    const result = await run('criar', 'nao-e-email', 'Bia');
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('E-mail inválido');
+  });
+
   it('subcomando desconhecido mostra o uso', async () => {
     const result = await run('xpto');
     expect(result.code).toBe(1);

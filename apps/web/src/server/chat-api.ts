@@ -2,7 +2,8 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { interpretResponse, type ApiResult } from "@/lib/chat-api-response";
 import { parseSetCookie } from "@/lib/set-cookie";
-import { config, SESSION_COOKIE } from "./config";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
+import { config } from "./config";
 
 interface CallOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";

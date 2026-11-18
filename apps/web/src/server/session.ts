@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { ApiResult } from "@/lib/chat-api-response";
 import { callChatApi } from "./chat-api";
-import { SESSION_COOKIE } from "./config";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
 
 export interface Member {
   id: string;

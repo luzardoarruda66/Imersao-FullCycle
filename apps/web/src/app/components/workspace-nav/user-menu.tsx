@@ -2,6 +2,7 @@
 
 import { Lock, LogOut } from "lucide-react";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { signOutAction } from "@/app/actions/session";
 import { ChangePasswordDialog } from "@/app/components/auth/change-password-dialog";
 import { Avatar } from "@/app/components/ui/avatar";
@@ -39,7 +40,12 @@ export function UserMenu({ name }: { name: string }) {
             Trocar senha
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => startTransition(() => signOutAction())}>
+          <DropdownMenuItem onSelect={() =>
+              startTransition(async () => {
+                const result = await signOutAction();
+                if (result?.error) toast.error(result.error);
+              })
+            }>
             <LogOut size={16} aria-hidden />
             Sair do Full Cycle
           </DropdownMenuItem>

@@ -18,4 +18,3 @@ if (!parsed.success) {
 }
 
 export const config = parsed.data;
-export const SESSION_COOKIE = "sid";

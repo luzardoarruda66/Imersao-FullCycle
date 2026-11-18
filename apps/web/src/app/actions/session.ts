@@ -49,9 +49,10 @@ export async function signInAction(_previous: SignInState, formData: FormData): 
   return { status: "error", kind: "falha", email };
 }
 
-export async function signOutAction(): Promise<void> {
-  // Encerra a sessão no servidor; o cookie some do navegador mesmo se a API não responder.
+/** Sair encerra a sessão no servidor. Com a API fora do ar a sessão continuaria viva, então a pessoa fica logada e vê o erro. */
+export async function signOutAction(): Promise<{ error: string } | void> {
   const result = await callChatApi("/v1/sessoes/atual", { method: "DELETE" });
+  if (result.kind === "unavailable") return { error: "Não foi possível sair agora. Confira sua conexão e tente de novo." };
   await forwardSetCookies(result.setCookies);
   await clearSessionCookie();
   redirect("/entrar");

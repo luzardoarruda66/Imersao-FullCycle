@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { signOutAction } from "@/app/actions/session";
 import { UserMenu } from "./user-menu";
 
@@ -7,7 +8,7 @@ vi.mock("@/app/actions/session", () => ({
   signOutAction: vi.fn(),
   changePasswordAction: vi.fn(),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 describe("UserMenu", () => {
   it("abre pelo avatar e mostra o nome, 'Trocar senha' e 'Sair do Full Cycle'", async () => {
@@ -27,6 +28,15 @@ describe("UserMenu", () => {
     await screen.findByRole("menu");
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     await waitFor(() => expect(signOutAction).toHaveBeenCalled());
+  });
+
+  it("com a API fora do ar, sair avisa o erro e a pessoa continua logada", async () => {
+    vi.mocked(signOutAction).mockResolvedValueOnce({ error: "Não foi possível sair agora." });
+    const user = userEvent.setup();
+    render(<UserMenu name="Ana Souza" />);
+    await user.click(screen.getByRole("button", { name: /Menu do usuário/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sair do Full Cycle" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível sair agora."));
   });
 
   it("'Trocar senha' abre o diálogo sem sair da tela", async () => {

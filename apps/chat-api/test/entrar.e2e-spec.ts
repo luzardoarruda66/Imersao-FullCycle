@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { PASSWORD, createTestApp, sidFrom, type TestApp } from './support/test-app.js';
 
 const EMAIL = 'ana@empresa.com';
@@ -95,6 +96,17 @@ describe('Entrar, sessão e trocar a senha (e2e HTTP)', () => {
         expect(correct.status).toBe(429);
         expect(correct.body.error.details.segundos_restantes).toBe(10 * 60);
         expect(sidFrom(correct)).toBeUndefined();
+      });
+
+      it('registra no log, com nível warn e sem a senha, a tentativa bloqueada', async () => {
+        const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        await failTimes(5);
+        await signIn({ email: EMAIL, senha: PASSWORD });
+        const messages = warn.mock.calls.map(([message]) => String(message));
+        expect(messages.length).toBeGreaterThanOrEqual(2);
+        expect(messages.some((message) => message.includes(EMAIL))).toBe(true);
+        expect(messages.join('\n')).not.toContain(PASSWORD);
+        warn.mockRestore();
       });
 
       it('conta também o e-mail inexistente', async () => {

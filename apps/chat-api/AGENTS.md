@@ -48,6 +48,24 @@ docker compose exec chat-api sh             # shell dentro do contêiner
 
 A app responde em http://localhost:3001.
 Testes e lint: `docker compose exec chat-api pnpm test`, `pnpm test:e2e`, `pnpm lint`.
+Os testes E2E usam o banco `chat_test`, que o setup cria e migra.
+
+Migrações do Banco do chat (`migrations/`): `docker compose exec chat-api pnpm migration:run`; depois de mudar uma entidade, confira com `pnpm migration:check`.
+As migrações não rodam na subida.
+
+Snapshot do contrato: `docker compose exec chat-api pnpm openapi` regrava `openapi.json`; o teste E2E falha quando ele fica velho.
+
+Comando de contas da operação (LLD, seção 6.2, "Operação"), com o subcomando no lugar de `<...>`:
+
+```
+docker compose exec chat-api pnpm contas criar <email> <nome>
+docker compose exec chat-api pnpm contas redefinir-senha <email>
+docker compose exec chat-api pnpm contas encerrar-sessoes <email>
+docker compose exec chat-api pnpm contas dar-admin <email>      # ou tirar-admin
+docker compose exec chat-api pnpm contas dar-permissao-dados <email>   # ou tirar-permissao-dados
+```
+
+`criar` e `redefinir-senha` mostram a senha gerada uma vez só.
 
 ## Práticas de código
 

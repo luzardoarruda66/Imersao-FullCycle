@@ -10,6 +10,11 @@ services:
       - .:/workspace
     environment:
       PORT: 3001
+      DATABASE_URL: postgres://chat_api:chat_api@postgres:5432/chat
+      COOKIE_DOMAIN: ""
+      WEB_ORIGIN: http://localhost:3000
+      # Rede interna do Compose, de onde vem o BFF (LLD, "Segurança": origem do IP).
+      TRUSTED_PROXY: loopback,linklocal,uniquelocal
     ports:
       - "3001:3001"
     depends_on:
@@ -23,9 +28,24 @@ services:
     working_dir: /workspace/apps/web
     volumes:
       - .:/workspace
+    environment:
+      # Endereço da API do chat entre contêineres (AGENTS.md da raiz, "Rede entre serviços").
+      CHAT_API_URL: http://chat-api:3001
+      COOKIE_DOMAIN: ""
     ports:
       - "3000:3000"
     depends_on:
+      - chat-api
+
+  # Testes de navegador: imagem oficial do Playwright, fora da subida padrão (`scripts/e2e.sh`).
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    profiles: [e2e]
+    working_dir: /workspace/apps/web
+    volumes:
+      - .:/workspace
+    depends_on:
+      - web
       - chat-api
 
   postgres:

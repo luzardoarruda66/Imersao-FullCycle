@@ -23,7 +23,15 @@ docker compose exec web sh                  # shell dentro do contêiner
 ```
 
 A app responde em http://localhost:3000.
-Lint: `docker compose exec web pnpm lint`.
+Lint, tipos e testes unitários e de componente (Vitest): `docker compose exec web pnpm lint`, `pnpm typecheck`, `pnpm test`.
+
+Testes de navegador (Playwright), a partir da raiz, com `web` e `chat-api` de pé (`pnpm dev --hostname 0.0.0.0` e `pnpm start:dev`) e as migrações aplicadas:
+
+```
+./scripts/e2e.sh
+```
+
+O script cria as contas de teste pelo comando `contas`, roda o serviço `e2e` do Compose e, num segundo passo, para a `chat-api` para provar a porta "Erro de sessão".
 
 ## Práticas de código
 

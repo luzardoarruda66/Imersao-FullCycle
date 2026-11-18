@@ -1,0 +1,281 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/sessoes": {
+      "post": {
+        "operationId": "SessionsController_signIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "senha"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "senha": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "O membro",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membro"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "dados_invalidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "credenciais_invalidas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "tentativas_demais (details.segundos_restantes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Entrar com e-mail e senha",
+        "tags": [
+          "sessoes"
+        ]
+      }
+    },
+    "/v1/sessoes/atual": {
+      "delete": {
+        "operationId": "SessionsController_signOut",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Sessão apagada; Set-Cookie expira o cookie"
+          },
+          "401": {
+            "description": "sessao_invalida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sair: apaga a sessão do cookie",
+        "tags": [
+          "sessoes"
+        ]
+      }
+    },
+    "/v1/eu": {
+      "get": {
+        "operationId": "MeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "O membro",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sessao_invalida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "summary": "O membro da sessão",
+        "tags": [
+          "eu"
+        ]
+      }
+    },
+    "/v1/eu/senha": {
+      "put": {
+        "operationId": "MeController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "senha_atual",
+                  "nova_senha"
+                ],
+                "properties": {
+                  "senha_atual": {
+                    "type": "string"
+                  },
+                  "nova_senha": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Senha trocada"
+          },
+          "400": {
+            "description": "dados_invalidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sessao_invalida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "senha_atual_incorreta ou senha_fraca (details.regras_faltando)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trocar a própria senha",
+        "tags": [
+          "eu"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "API do chat",
+    "description": "",
+    "version": "1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "ErroCodigo": {
+        "type": "string",
+        "enum": [
+          "dados_invalidos",
+          "credenciais_invalidas",
+          "tentativas_demais",
+          "sessao_invalida",
+          "senha_atual_incorreta",
+          "senha_fraca",
+          "origem_invalida",
+          "nao_encontrado",
+          "erro_interno"
+        ]
+      },
+      "Erro": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErroCodigo"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            }
+          }
+        }
+      },
+      "Membro": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "nome",
+          "administrador",
+          "permissao_dados"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "administrador": {
+            "type": "boolean"
+          },
+          "permissao_dados": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

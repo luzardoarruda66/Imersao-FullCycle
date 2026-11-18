@@ -10,6 +10,11 @@ services:
       - .:/workspace
     environment:
       PORT: 3001
+      DATABASE_URL: postgres://chat_api:chat_api@postgres:5432/chat
+      COOKIE_DOMAIN: ""
+      WEB_ORIGIN: http://localhost:3000
+      # Rede interna do Compose, de onde vem o BFF (LLD, "Segurança": origem do IP).
+      TRUSTED_PROXY: loopback,linklocal,uniquelocal
     ports:
       - "3001:3001"
     depends_on:

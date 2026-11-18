@@ -8,11 +8,8 @@ import { entrarPath } from "@/lib/safe-redirect";
  */
 export function proxy(request: NextRequest) {
   if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
-  const url = request.nextUrl.clone();
-  const [pathname, search = ""] = entrarPath(request.nextUrl.pathname + request.nextUrl.search).split("?");
-  url.pathname = pathname!;
-  url.search = search;
-  return NextResponse.redirect(url);
+  const wanted = request.nextUrl.pathname + request.nextUrl.search;
+  return NextResponse.redirect(new URL(entrarPath(wanted), request.nextUrl));
 }
 
 export const config = {

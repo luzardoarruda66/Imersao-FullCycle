@@ -1,6 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { SessionService } from '@nestjs/authentication';
-import { z } from 'zod';
+import { emailSchema } from '../auth/auth.schemas.js';
 import { generatePassword } from '../accounts/password-rule.js';
 import { EmailAlreadyRegisteredError, PeopleService } from '../accounts/people.service.js';
 
@@ -37,7 +37,7 @@ export async function runContas(argv: string[], app: INestApplicationContext): P
     case 'criar': {
       const name = rest.join(' ').trim();
       if (!email || !name) return fail('Informe o e-mail e o nome: criar <email> <nome>');
-      if (!z.email().safeParse(email.trim()).success) return fail(`E-mail inválido: ${email}`);
+      if (!emailSchema.safeParse(email).success) return fail(`E-mail inválido: ${email}`);
       const password = generatePassword();
       try {
         const person = await people.create({ email, name, password });

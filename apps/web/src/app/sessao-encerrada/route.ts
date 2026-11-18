@@ -8,10 +8,8 @@ import { clearSessionCookie } from "@/server/chat-api";
  */
 export async function GET(request: NextRequest) {
   await clearSessionCookie();
-  const url = request.nextUrl.clone();
   const wanted = safeNext(request.nextUrl.searchParams.get("para"));
-  url.pathname = "/entrar";
-  url.search = "";
-  if (wanted !== "/") url.searchParams.set("para", wanted);
-  return NextResponse.redirect(url);
+  // Redirecionamento relativo: atrás do contêiner o servidor escuta em 0.0.0.0, e a URL absoluta sairia com esse host.
+  const location = wanted === "/" ? "/entrar" : `/entrar?para=${encodeURIComponent(wanted)}`;
+  return new NextResponse(null, { status: 307, headers: { Location: location } });
 }

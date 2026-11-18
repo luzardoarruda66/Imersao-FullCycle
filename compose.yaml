@@ -37,6 +37,17 @@ services:
     depends_on:
       - chat-api
 
+  # Testes de navegador: imagem oficial do Playwright, fora da subida padrão (`scripts/e2e.sh`).
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    profiles: [e2e]
+    working_dir: /workspace/apps/web
+    volumes:
+      - .:/workspace
+    depends_on:
+      - web
+      - chat-api
+
   postgres:
     image: postgres:18
     environment:

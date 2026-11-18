@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { changePasswordAction, type ChangePasswordState } from "@/app/actions/session";
 import { Button } from "@/app/components/ui/button";
@@ -12,6 +12,12 @@ const IDLE: ChangePasswordState = { status: "idle" };
 
 function ChangePasswordForm({ onDone }: { onDone: () => void }) {
   const [state, formAction, pending] = useActionState(changePasswordAction, IDLE);
+  // Controlados: o React 19 limpa os campos não controlados depois do envio, e quem erra um campo não deve redigitar os outros.
+  const [values, setValues] = useState({ senhaAtual: "", novaSenha: "", confirmacao: "" });
+  const bind = (key: keyof typeof values) => ({
+    value: values[key],
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => setValues((current) => ({ ...current, [key]: event.target.value })),
+  });
   const errors = state.status === "error" ? state.fieldErrors : undefined;
 
   useEffect(() => {
@@ -24,13 +30,13 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
     <form action={formAction} noValidate>
       <div className="flex flex-col gap-4 px-6 py-3">
         <Field id="senhaAtual" label="Senha atual" error={errors?.senhaAtual}>
-          {(aria) => <Input {...aria} name="senhaAtual" type="password" autoComplete="current-password" autoFocus />}
+          {(aria) => <Input {...aria} name="senhaAtual" type="password" autoComplete="current-password" data-autofocus {...bind("senhaAtual")} />}
         </Field>
         <Field id="novaSenha" label="Nova senha" hint={PASSWORD_RULE_HINT} error={errors?.novaSenha}>
-          {(aria) => <Input {...aria} name="novaSenha" type="password" autoComplete="new-password" />}
+          {(aria) => <Input {...aria} name="novaSenha" type="password" autoComplete="new-password" {...bind("novaSenha")} />}
         </Field>
         <Field id="confirmacao" label="Confirmar nova senha" error={errors?.confirmacao}>
-          {(aria) => <Input {...aria} name="confirmacao" type="password" autoComplete="new-password" />}
+          {(aria) => <Input {...aria} name="confirmacao" type="password" autoComplete="new-password" {...bind("confirmacao")} />}
         </Field>
         {state.status === "error" && state.general && (
           <p role="alert" className="text-small text-danger-fg">

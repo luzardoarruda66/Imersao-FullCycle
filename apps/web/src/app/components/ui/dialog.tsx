@@ -17,6 +17,14 @@ export function DialogContent({ title, description, children, className }: {
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 animate-fade-in bg-surface-overlay" />
       <DialogPrimitive.Content
+        // O Radix focaria o botão de fechar, o primeiro da ordem de tab; o foco vai para o primeiro campo.
+        onOpenAutoFocus={(event) => {
+          const field = (event.currentTarget as HTMLElement).querySelector<HTMLElement>("[data-autofocus]");
+          if (field) {
+            event.preventDefault();
+            field.focus();
+          }
+        }}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 animate-pop-in flex-col rounded-card bg-surface-raised shadow-3",
           className,

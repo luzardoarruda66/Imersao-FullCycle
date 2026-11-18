@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { signInAction, type SignInState } from "@/app/actions/session";
 import { Button } from "@/app/components/ui/button";
 import { Field, Input } from "@/app/components/ui/field";
@@ -20,6 +20,9 @@ function bannerOf(state: SignInState): string | undefined {
 /** Formulário de "Entrar" (frames `Login / ...` do Figma). Enter envia; os erros são anunciados. */
 export function LoginForm({ para }: { para: string }) {
   const [state, formAction, pending] = useActionState(signInAction, IDLE);
+  // Controlados: o React 19 limpa os campos não controlados depois do envio, e quem erra a senha não deve redigitar o e-mail.
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const banner = bannerOf(state);
   // Credenciais incorretas marcam o campo da senha (frame `Credenciais incorretas`); validação marca cada campo.
   const fieldErrors =
@@ -40,13 +43,23 @@ export function LoginForm({ para }: { para: string }) {
             type="email"
             autoComplete="username"
             placeholder="nome@empresa.com"
-            defaultValue={state.status === "error" ? state.email : ""}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             autoFocus
           />
         )}
       </Field>
       <Field id="senha" label="Senha" error={fieldErrors?.senha}>
-        {(aria) => <Input {...aria} name="senha" type="password" autoComplete="current-password" />}
+        {(aria) => (
+          <Input
+            {...aria}
+            name="senha"
+            type="password"
+            autoComplete="current-password"
+            value={senha}
+            onChange={(event) => setSenha(event.target.value)}
+          />
+        )}
       </Field>
       {banner && (
         <p role="alert" className="text-small text-danger-fg">

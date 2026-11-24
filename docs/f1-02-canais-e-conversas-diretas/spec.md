@@ -134,11 +134,56 @@ enviar a própria mensagem. O tempo real, a paginação e as não lidas são da 
 ## Decisões de implementação
 
 **Arquivo de design.** O Figma do projeto é o `GXeHfkmxrSH9mGMHTweQSP` (`docs/design-system.md`).
-Os frames desta entrega ainda não existem no Figma e são a primeira tarefa, pelo fluxo "Do Figma
-para o código" do design system: sidebar com as seções Canais e Conversas diretas, área da conversa
-(com lista de mensagens, campo de envio, estado vazio e conversa inexistente), diálogo Criar canal,
-diálogo Convidar, lista de participantes e seletor de membro para a conversa direta, nos temas claro
-e escuro. Os node-ids entram nesta tabela quando os frames existirem.
+Os frames desta entrega estão na seção `F1-02 Canais e conversas diretas` (`2060:68853`) da página
+Telas, nos temas claro e escuro, e são o que o código implementa pelo fluxo "Do Figma para o código"
+do design system. Cada tela tem dois frames: o claro, sem sufixo, e o escuro, com o sufixo
+`(escuro)`. O tema vem do modo `Semantic` da variable, definido no próprio frame (`Light` ou `Dark`):
+a página Telas tem o modo `Dark` por padrão, então um frame sem o modo explícito aparece escuro.
+
+| Tela | Frame (claro) | Node-id claro | Node-id escuro |
+| --- | --- | --- | --- |
+| Conversa | `Canais / Conversa / Canal público` | `2061:68930` | `2061:69405` |
+| Conversa | `Canais / Conversa / Canal privado` | `2061:69864` | `2061:70199` |
+| Conversa | `Canais / Conversa / Canal vazio` | `2061:70530` | `2061:70874` |
+| Conversa | `Canais / Conversa / Conversa não encontrada` | `2061:71218` | `2061:71508` |
+| Conversa | `Canais / Conversa / Conversa direta` | `2061:71798` | `2061:72149` |
+| Conversa | `Canais / Conversa / Falha no envio` | `2061:72495` | `2061:72964` |
+| Conversa | `Canais / Conversa / Mensagem acima do limite` | `2061:73433` | `2061:73886` |
+| Participantes | `Canais / Participantes / Canal privado` | `2064:71714` | `2064:72307` |
+| Criar canal | `Canais / Criar canal / Padrão` | `2064:72876` | `2064:73392` |
+| Criar canal | `Canais / Criar canal / Erro no nome` | `2064:73908` | `2064:74424` |
+| Criar canal | `Canais / Criar canal / Nome em uso` | `2064:74940` | `2064:75457` |
+| Criar canal | `Canais / Criar canal / Tipo não escolhido` | `2064:75974` | `2064:76497` |
+| Criar canal | `Canais / Criar canal / Enviando` | `2064:77020` | `2064:77537` |
+| Criar canal | `Canais / Criar canal / Falha ao criar` | `2064:78054` | `2064:78572` |
+| Convidar | `Canais / Convidar / Padrão` | `2065:76234` | `2065:76838` |
+| Convidar | `Canais / Convidar / Pessoas escolhidas` | `2065:77414` | `2065:77994` |
+| Convidar | `Canais / Convidar / Ninguém para convidar` | `2065:78574` | `2065:79102` |
+| Convidar | `Canais / Convidar / Enviando` | `2065:79630` | `2065:80214` |
+| Convidar | `Canais / Convidar / Falha ao convidar` | `2065:80796` | `2065:81377` |
+| Conversa direta | `Canais / Conversa direta / Escolher membro` | `2065:81958` | `2065:82515` |
+| Conversa direta | `Canais / Conversa direta / Carregando membros` | `2065:83072` | `2065:83561` |
+| Conversa direta | `Canais / Conversa direta / Abrindo` | `2065:84050` | `2065:84607` |
+| Conversa direta | `Canais / Conversa direta / Falha ao abrir` | `2065:85164` | `2065:85722` |
+| Lista de conversas | `Canais / Lista / Carregando` | `2065:86280` | `2065:86386` |
+| Lista de conversas | `Canais / Lista / Erro ao carregar` | `2065:86492` | `2065:86595` |
+
+Os frames partem dos de referência das seções Conversa, Casca e Diálogos da casca, já sem o que é de
+outras fases: a seção Agentes, a presença e o status, o tópico do canal, as não lidas, o botão `@`
+do campo de mensagem, a aba Atividade e o `ThemeToggle` do Rail. O que é específico desta entrega:
+
+- **Lista de conversas:** a seção das conversas diretas se chama "Conversas diretas".
+- **Atualizar a conversa:** um `IconButton` com `icon/rotate-ccw` no cabeçalho (história 12),
+  à esquerda do botão de participantes nos canais privados.
+- **Criar canal:** sem tópico e sem interruptor. O tipo é um grupo de dois `RadioOption`, Público e
+  Privado, sem nenhum escolhido de antemão (história 18); no estado `Tipo não escolhido`, os dois ficam
+  com a borda `danger` e a mensagem "Escolha se o canal é público ou privado.".
+- **Convidar e seletor de membro:** sem campo de busca e sem `@usuário` nem cargo, só o nome (história
+  42). O seletor da conversa direta não lista o próprio membro (história 41), e o Convidar não lista
+  quem já participa (história 29).
+- **Participantes:** só os nomes, com o botão "Convidar pessoas".
+- **Falha no envio:** o campo mantém o texto e um `Toast` de erro avisa que o envio não chegou à API
+  (história 13).
 
 **Modelo de dados (Banco do chat)**
 

@@ -458,7 +458,7 @@ A página **Components** tem quatro seções:
 | Seção | Conteúdo |
 | --- | --- |
 | Ícones | 42 componentes `icon/<nome-lucide>` |
-| Primitivos | Spinner, Avatar, Button, IconButton, CountBadge, PresenceDot, Kbd, Skeleton, Input, Textarea, Field, Switch, TabsTrigger, DropdownMenuItem, DropdownMenuSeparator, Tooltip, Toast, EmptyState, DialogHeader, ConfirmDialog |
+| Primitivos | Spinner, Avatar, Button, IconButton, CountBadge, PresenceDot, Kbd, Skeleton, Input, Textarea, Field, Switch, RadioOption, TabsTrigger, DropdownMenuItem, DropdownMenuSeparator, Tooltip, Toast, EmptyState, DialogHeader, ConfirmDialog |
 | Entities | UserAvatar, UserStatus, AgentAvatar, AgentTag, ChannelIcon, MentionChip, DayDivider, UnreadDivider, MessageSkeleton, NotificationItem, TaskItem, ReplyQuote, MessageActions, MessageEditor, AgentText, MessageItem, AgentRuns |
 | Features e widgets | SidebarRow, SidebarSection, SidebarAction, Sidebar, Rail, ThemeToggle, ConnectionBanner, ConversationHeader, ActivityHeader, ConversationIntro, MessageComposer, MentionOption, NewMessagesPill, JumpStatusPill, PersonRow, AgentRow, ContactRow, ProfilePanel, UserMenu, MessageMenu |
 
@@ -548,6 +548,7 @@ Estes detalhes não aparecem só olhando o desenho:
 - **AgentAvatar:** o robô (`Bot`) distingue agentes de pessoas.
 - **Input:** `h-9`, borda `border-strong`. **Textarea:** `min-h-20`, `py-2`. **Field:** rótulo + controle + dica ou erro.
 - **DropdownMenuItem:** `h-8`, destacado com `sidebar-active`. **DropdownMenuSeparator:** `my-2`, 1 px.
+- **RadioOption:** escolha única (Radix RadioGroup), com `Checked` e `State=invalid`. Num grupo ninguém vem escolhido de antemão; a mensagem de erro do grupo fica no `Field`, e a borda `danger` aparece em todas as opções quando se tenta enviar sem escolher.
 - **Dialog:** largura máxima de 512, `rounded-card`, `shadow-3`, foco no primeiro campo.
 - **ConfirmDialog:** largura máxima de 448, foco em Cancelar, não fecha ao clicar fora (Radix AlertDialog).
 - **Toast:** Sonner, no canto inferior direito, com botão de fechar. Os ícones de sucesso e erro são do Sonner, não do Lucide.

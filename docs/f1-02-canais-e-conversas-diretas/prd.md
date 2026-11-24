@@ -89,6 +89,6 @@ Não se aplica. A F1-02 não envolve agentes.
 | --- | --- |
 | Membro vê canal privado de que não participa | Recusa no servidor em toda rota, com teste de acesso por papel; resposta igual à de canal inexistente |
 | Membro cria canal público quando queria privado e expõe conteúdo | A escolha entre público e privado é explícita e sem valor padrão no formulário. A conversão fica fora do MVP |
-| Sem tempo real, a conversa parece quebrada (é preciso recarregar) | Aceito até a F1-04; a tela deixa claro como atualizar |
+| Sem tempo real, a conversa parece quebrada (é preciso recarregar) | Resolvido nesta entrega: a mensagem e a conversa novas chegam na hora pelo canal da FD-03 |
 | Convidado errado entra num canal privado e não dá para removê-lo | Aceito no MVP, pois remover é F2-03; o risco fica registrado |
 | Muitas conversas deixam a lista confusa | Ordem alfabética e separação entre canais e conversas diretas; busca de conversas fica fora |

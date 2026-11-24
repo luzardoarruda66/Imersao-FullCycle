@@ -8,7 +8,7 @@ COMPOSE="docker compose -f compose.yaml"
 
 # Uma conta por cenário que muda estado, com a senha gerada pelo comando `contas` (mostrada uma vez só).
 accounts='{'
-for name in link abas sair senha; do
+for name in link abas sair senha canais-a canais-b canais-c teclado; do
   email="e2e-${name}@fullcycle.dev"
   out=$($COMPOSE exec -T chat-api pnpm contas redefinir-senha "$email" 2>&1 || true)
   if ! grep -q "Senha (mostrada" <<<"$out"; then

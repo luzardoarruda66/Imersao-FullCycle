@@ -19,8 +19,9 @@ diretas, abre uma delas, lê as 50 mensagens mais recentes e escreve novas. Cria
 privado, convida membros para um canal privado e abre uma conversa direta escolhendo outro membro
 numa lista. Quem não participa de um canal privado não o vê na lista, nem por link, nem pela API.
 
-Sem tempo real nesta entrega: a conversa mostra o que existe ao abrir e ao recarregar, e depois de
-enviar a própria mensagem. O tempo real, a paginação e as não lidas são da F1-04.
+O tempo real mínimo das conversas entra nesta entrega, pelo canal da FD-03: a mensagem de outra pessoa
+aparece na conversa aberta na hora, e o canal, a conversa direta ou o convite novos aparecem na lateral sem
+recarregar. A paginação, o aviso de "digitando" e as não lidas são da F1-04.
 
 ## Histórias de usuário
 
@@ -46,8 +47,8 @@ enviar a própria mensagem. O tempo real, a paginação e as não lidas são da 
 10. Como membro, quero que mensagens com mais de 4.000 caracteres sejam recusadas com um aviso, para
     saber que preciso dividir o texto.
 11. Como membro, quero ver a minha mensagem aparecer na conversa depois de enviar, sem recarregar.
-12. Como membro, quero ver como atualizar a conversa para ler o que os outros escreveram, enquanto o
-    tempo real não existe.
+12. Como membro, quero ver na hora, sem recarregar, a mensagem que outra pessoa escreve na conversa
+    aberta e o canal, a conversa direta ou o convite novos na lateral.
 13. Como membro, quero ver uma mensagem de falha quando o envio não chega à API, mantendo o texto
     que escrevi, para tentar de novo sem digitar tudo.
 14. Como membro, quero ler uma conversa vazia com um convite a escrever a primeira mensagem, para
@@ -173,8 +174,8 @@ outras fases: a seção Agentes, a presença e o status, o tópico do canal, as 
 do campo de mensagem, a aba Atividade e o `ThemeToggle` do Rail. O que é específico desta entrega:
 
 - **Lista de conversas:** a seção das conversas diretas se chama "Conversas diretas".
-- **Atualizar a conversa:** um `IconButton` com `icon/rotate-ccw` no cabeçalho (história 12),
-  à esquerda do botão de participantes nos canais privados.
+- **Atualizar a conversa:** os frames trazem um `IconButton` com `icon/rotate-ccw` no cabeçalho, do tempo em
+  que o tempo real não existia. Com o tempo real (história 12), o botão não é implementado.
 - **Criar canal:** sem tópico e sem interruptor. O tipo é um grupo de dois `RadioOption`, Público e
   Privado, sem nenhum escolhido de antemão (história 18); no estado `Tipo não escolhido`, os dois ficam
   com a borda `danger` e a mensagem "Escolha se o canal é público ou privado.".
@@ -286,7 +287,8 @@ testar a implementação (chamadas internas, consultas geradas).
 
 ## Fora do escopo
 
-- Tempo real, aviso de "digitando", histórico paginado e contagem de não lidas e de menções: F1-04.
+- Aviso de "digitando", histórico paginado e contagem de não lidas e de menções: F1-04. O tempo real das
+  mensagens e das conversas novas entra nesta entrega.
 - Menção, citação, copiar texto, editar e apagar mensagens: F1-05.
 - Busca de pessoas, @usuário e perfil: F1-03.
 - Notificações e a tela Atividade: F1-06.

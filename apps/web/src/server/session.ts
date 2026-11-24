@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { callChatApi } from "./chat-api";
 import { SESSION_COOKIE } from "@/lib/session-cookie";
 
@@ -17,7 +18,7 @@ export type SessionState =
   | { kind: "unavailable" }; // API fora do ar: ninguém sai da sessão por isso
 
 /** O membro da sessão, conferido na API do chat (o proxy só olha se o cookie existe). */
-export async function getSessionState(): Promise<SessionState> {
+export const getSessionState = cache(async (): Promise<SessionState> => {
   const jar = await cookies();
   if (!jar.get(SESSION_COOKIE)) return { kind: "none" };
   const result = await callChatApi<Member>("/v1/eu");
@@ -25,4 +26,4 @@ export async function getSessionState(): Promise<SessionState> {
   // Só o 401 (`sessao_invalida`) derruba a sessão; qualquer outra falha é da API, e uma queda não tira ninguém da sessão.
   if (result.kind === "invalid-session") return { kind: "none" };
   return { kind: "unavailable" };
-}
+});

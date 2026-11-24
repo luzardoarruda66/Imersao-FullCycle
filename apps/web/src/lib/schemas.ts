@@ -23,6 +23,34 @@ export const changePasswordSchema = z
     message: "As senhas não são iguais.",
   });
 
+/** Limites das conversas (LLD, seção 9, "Valores e configuração"). */
+export const CHANNEL_NAME_MAX = 80;
+export const MESSAGE_TEXT_MAX = 4000;
+
+export const createChannelSchema = z.object({
+  nome: z
+    .string()
+    .trim()
+    .min(1, `Informe um nome de 1 a ${CHANNEL_NAME_MAX} caracteres.`)
+    .max(CHANNEL_NAME_MAX, `O nome pode ter no máximo ${CHANNEL_NAME_MAX} caracteres.`),
+  // Sem tipo escolhido de antemão: quem não escolhe vê o erro, e nenhum canal sai público por engano.
+  tipo: z.enum(["publico", "privado"], { error: "Escolha se o canal é público ou privado." }),
+});
+
+export const sendMessageSchema = z.object({
+  texto: z
+    .string()
+    .trim()
+    .min(1, "Escreva uma mensagem.")
+    .max(MESSAGE_TEXT_MAX, "A mensagem passa de 4.000 caracteres. Divida o texto em mais de uma mensagem."),
+});
+
+export const inviteSchema = z.object({
+  membrosIds: z.array(z.uuid()).min(1, "Escolha pelo menos uma pessoa."),
+});
+
+export const openDirectSchema = z.object({ membroId: z.uuid() });
+
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;
 
 /** Primeiro erro de cada campo, para mostrar na tela. */

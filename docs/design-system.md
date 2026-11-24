@@ -441,9 +441,12 @@ No Figma, as variables `z/*` e `breakpoint/*` são só de referência, sem escop
 | Não lido | Texto em `font-black` na sidebar; na Atividade, fundo `highlight-bg`, título bold e ponto `badge`. |
 
 ```css
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/* Em `@layer base`: sem a camada, a regra vence as utilidades do Tailwind e o `focus-visible:outline-none` dos campos não a sobrescreve. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
 ```
 

@@ -118,6 +118,66 @@ describe('Comando contas (e2e)', () => {
     });
   });
 
+  describe('definir-usuario', () => {
+    it('troca o @usuário, aceitando o @ inicial e qualquer caixa, e libera o antigo', async () => {
+      await t.createPerson({ email: 'ana@empresa.com', name: 'Ana', username: 'ana' });
+      const result = await run('definir-usuario', 'ana@empresa.com', '@Ana.Nova');
+      expect(result.code).toBe(0);
+      expect(result.out).toContain('@ana.nova');
+
+      const taken = await run('criar', 'outra@empresa.com', 'ana.nova', 'Outra');
+      expect(taken.err).toContain('@ana.nova já está em uso');
+      const freed = await run('criar', 'bia@empresa.com', 'ana', 'Bia');
+      expect(freed.code).toBe(0);
+    });
+
+    it('aceita o @usuário que a conta já tem', async () => {
+      await t.createPerson({ email: 'ana@empresa.com', name: 'Ana', username: 'ana' });
+      expect((await run('definir-usuario', 'ana@empresa.com', 'ana')).code).toBe(0);
+    });
+
+    it('recusa conta que não existe', async () => {
+      const result = await run('definir-usuario', 'ninguem@empresa.com', 'novo');
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('Não existe conta com o e-mail ninguem@empresa.com');
+    });
+
+    it('recusa @usuário em uso por outra conta, sem alterar nada', async () => {
+      await t.createPerson({ email: 'ana@empresa.com', name: 'Ana', username: 'ana' });
+      await t.createPerson({ email: 'bia@empresa.com', name: 'Bia', username: 'bia' });
+      const result = await run('definir-usuario', 'bia@empresa.com', 'ANA');
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('@ana já está em uso');
+      // Continua com o @usuário de antes: ninguém mais consegue pegá-lo.
+      const still = await run('criar', 'cris@empresa.com', 'bia', 'Cris');
+      expect(still.err).toContain('@bia já está em uso');
+    });
+
+    it('recusa @usuário fora do formato', async () => {
+      await t.createPerson({ email: 'ana@empresa.com', name: 'Ana', username: 'ana' });
+      for (const username of ['ab', 'joão', 'a!b', 'x'.repeat(31)]) {
+        const result = await run('definir-usuario', 'ana@empresa.com', username);
+        expect(result.code, username).toBe(1);
+        expect(result.err, username).toContain('formato');
+      }
+    });
+
+    it('pede o e-mail e o @usuário', async () => {
+      for (const argv of [['definir-usuario'], ['definir-usuario', 'ana@empresa.com']]) {
+        const result = await run(...argv);
+        expect(result.code, argv.join(' ')).toBe(1);
+        expect(result.err, argv.join(' ')).toContain('definir-usuario <email> <usuario>');
+      }
+    });
+
+    it('não encerra as sessões da conta', async () => {
+      await t.createPerson({ email: 'ana@empresa.com', name: 'Ana', username: 'ana' });
+      const sid = sidFrom(await signIn('ana@empresa.com', PASSWORD))!;
+      await run('definir-usuario', 'ana@empresa.com', 'ana.nova');
+      expect((await t.http().get('/v1/eu').set('Cookie', sid)).status).toBe(200);
+    });
+  });
+
   it('subcomando desconhecido mostra o uso', async () => {
     const result = await run('xpto');
     expect(result.code).toBe(1);

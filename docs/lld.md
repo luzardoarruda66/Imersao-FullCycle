@@ -358,14 +358,13 @@ Os números estão em "Valores e configuração".
 - **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
   `regra da senha`, e a recusa lista as regras que faltaram. Depois da troca, a sessão atual
   continua e as outras sessões da pessoa são apagadas.
-- **Operação.** O comando `contas` da API do chat cria a conta (e-mail e nome), redefine a senha,
-  encerra as sessões, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
+- **Operação.** O comando `contas` da API do chat cria a conta (e-mail, @usuário e nome), redefine a
+  senha, encerra as sessões, troca o @usuário, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
   geram uma senha aleatória que cumpre a `regra da senha` e a mostram uma vez só; não há troca
   obrigatória no primeiro acesso. Encerrar as sessões, ou redefinir a senha, apaga todas as
   sessões da pessoa.
-  `criar` recebe e-mail, @usuário e nome; @usuário em uso ou fora do formato (`formato do @usuário`) é
-  recusado, com mensagem clara. **Alteração `planejada` (F1-03):** o subcomando `definir-usuario` troca
-  o @usuário de uma conta.
+  `criar` e `definir-usuario` recusam @usuário em uso ou fora do formato (`formato do @usuário`), com
+  mensagem clara. Trocar o @usuário não encerra as sessões da conta; só a operação o troca.
 
 ## 7. Processos de segundo plano
 

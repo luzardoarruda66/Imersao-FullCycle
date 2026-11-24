@@ -61,6 +61,7 @@ Comando de contas da operação (LLD, seção 6.2, "Operação"), com o subcoman
 
 ```
 docker compose exec chat-api pnpm contas criar <email> <usuario> <nome>
+docker compose exec chat-api pnpm contas definir-usuario <email> <usuario>
 docker compose exec chat-api pnpm contas redefinir-senha <email>
 docker compose exec chat-api pnpm contas encerrar-sessoes <email>
 docker compose exec chat-api pnpm contas dar-admin <email>      # ou tirar-admin

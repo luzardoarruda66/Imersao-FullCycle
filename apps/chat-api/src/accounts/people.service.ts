@@ -51,6 +51,17 @@ export class PeopleService {
     await this.people.update({ id }, { passwordHash: await this.hasher.hash(password), updatedAt: new Date() });
   }
 
+  /** Troca o @usuário da conta; o índice único decide a corrida com outro cadastro ou outra troca. */
+  async setUsername(id: string, username: string) {
+    const normalized = normalizeUsername(username);
+    await this.people
+      .update({ id }, { username: normalized, updatedAt: new Date() })
+      .catch((error: { code?: string; constraint?: string }) => {
+        if (error.code === '23505' && error.constraint === 'UQ_people_username') throw new UsernameAlreadyTakenError(normalized);
+        throw error;
+      });
+  }
+
   async setFlags(id: string, flags: Partial<Pick<PersonEntity, 'isAdmin' | 'hasDataPermission'>>) {
     await this.people.update({ id }, { ...flags, updatedAt: new Date() });
   }

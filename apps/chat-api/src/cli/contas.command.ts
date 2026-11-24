@@ -15,6 +15,7 @@ export interface CommandResult {
 const USAGE = `Uso: pnpm contas <subcomando>
 
   criar <email> <usuario> <nome>  Cria a conta e mostra a senha gerada, uma vez só
+  definir-usuario <email> <usuario>  Troca o @usuário da conta
   redefinir-senha <email>     Gera uma senha nova, mostra uma vez e encerra as sessões
   encerrar-sessoes <email>    Encerra todas as sessões da pessoa
   dar-admin <email>           Dá o papel de administrador
@@ -42,11 +43,7 @@ export async function runContas(argv: string[], app: INestApplicationContext): P
       if (!email || !rawUsername || !name) return fail('Informe o e-mail, o @usuário e o nome: criar <email> <usuario> <nome>');
       if (!emailSchema.safeParse(email).success) return fail(`E-mail inválido: ${email}`);
       const username = normalizeUsername(rawUsername);
-      if (!isValidUsername(username)) {
-        return fail(
-          `@usuário fora do formato: use de ${USERNAME_MIN_LENGTH} a ${USERNAME_MAX_LENGTH} caracteres entre letras minúsculas sem acento, números, ".", "-" e "_".`,
-        );
-      }
+      if (!isValidUsername(username)) return fail(USERNAME_FORMAT_MESSAGE);
       const password = generatePassword();
       try {
         const person = await people.create({ email, username, name, password });
@@ -56,6 +53,21 @@ export async function runContas(argv: string[], app: INestApplicationContext): P
         if (error instanceof UsernameAlreadyTakenError) return fail(`O @${username} já está em uso.`);
         throw error;
       }
+    }
+    case 'definir-usuario': {
+      const [rawUsername] = rest;
+      if (!email || !rawUsername) return fail('Informe o e-mail e o @usuário: definir-usuario <email> <usuario>');
+      const person = await needsPerson();
+      if (!person) return fail(noAccount(email));
+      const username = normalizeUsername(rawUsername);
+      if (!isValidUsername(username)) return fail(USERNAME_FORMAT_MESSAGE);
+      try {
+        await people.setUsername(person.id, username);
+      } catch (error) {
+        if (error instanceof UsernameAlreadyTakenError) return fail(`O @${username} já está em uso.`);
+        throw error;
+      }
+      return ok(`${person.email}: o @usuário agora é @${username}.`);
     }
     case 'redefinir-senha': {
       const person = await needsPerson();
@@ -87,6 +99,7 @@ export async function runContas(argv: string[], app: INestApplicationContext): P
   }
 }
 
+const USERNAME_FORMAT_MESSAGE = `@usuário fora do formato: use de ${USERNAME_MIN_LENGTH} a ${USERNAME_MAX_LENGTH} caracteres entre letras minúsculas sem acento, números, ".", "-" e "_".`;
 const normalized = (email: string) => email.trim().toLowerCase();
 const noAccount = (email: string | undefined) =>
   email ? `Não existe conta com o e-mail ${normalized(email)}.` : 'Informe o e-mail da conta.';

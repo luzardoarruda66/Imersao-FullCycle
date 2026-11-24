@@ -555,7 +555,7 @@ identificador), e o `conversa_visivel` faz o `web` reler a lateral.
 | Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | Constantes `USERNAME_MIN_LENGTH` e `USERNAME_MAX_LENGTH`, no mesmo arquivo; função `isValidUsername`, em `apps/chat-api/src/accounts/username-rule.ts` |
 | Resultados da busca de pessoas | No máximo 20 | API do chat | Constante `PEOPLE_SEARCH_LIMIT`, no mesmo arquivo |
 | Prazo para editar e apagar | 4 horas depois do envio (PRD da F1-05) | API do chat e `web` | A definir |
-| Tamanho do trecho da citação | 140 caracteres (spec da F1-05) | API do chat | A definir |
+| Tamanho do trecho da citação | 140 caracteres, contados como caracteres de verdade (spec da F1-05) | API do chat e `web` | Constante `QUOTE_EXCERPT_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/messages.ts` |
 
 **Variáveis de ambiente**
 

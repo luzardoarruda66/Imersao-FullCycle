@@ -96,6 +96,6 @@ export class ConversationsController {
     @Body({ schema: sendMessageSchema }) body: SendMessageDto,
     @CurrentUser() member: Member,
   ) {
-    return this.messages.send(id, member.id, body.texto);
+    return this.messages.send(id, member.id, body.texto, body.citacao_id);
   }
 }

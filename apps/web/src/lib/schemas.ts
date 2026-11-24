@@ -43,6 +43,8 @@ export const sendMessageSchema = z.object({
     .trim()
     .min(1, "Escreva uma mensagem.")
     .max(MESSAGE_TEXT_MAX, "A mensagem passa de 4.000 caracteres. Divida o texto em mais de uma mensagem."),
+  /** A mensagem que esta cita; ausente ou vazia é uma mensagem sem citação. */
+  citacaoId: z.preprocess((value) => (value === "" ? undefined : value), z.uuid().optional()),
 });
 
 export const inviteSchema = z.object({

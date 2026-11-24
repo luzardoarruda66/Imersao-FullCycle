@@ -2,6 +2,7 @@
 
 import type { ChatMessage } from "chat-events";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { markReadAction } from "@/app/actions/conversations";
 import { MessageComposer } from "@/app/components/conversation/message-composer";
 import { MessageList } from "@/app/components/conversation/message-list";
@@ -50,6 +51,8 @@ export function ConversationPane({
   const [loadError, setLoadError] = useState(false);
   const [typers, setTypers] = useState<TypingState>({});
   const [atBottom, setAtBottom] = useState(true);
+  // A mensagem que a próxima vai citar.
+  const [quote, setQuote] = useState<ChatMessage | null>(null);
   const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState === "visible");
   // O servidor releu a conversa (atualização da página, reconexão): junta o que veio com o que já estava na tela.
   if (initialMessages !== seen) {
@@ -126,6 +129,74 @@ export function ConversationPane({
     }
   }, [conversationId, loadingOlder, messages]);
 
+  // A mensagem que a pessoa pediu para ver ao clicar numa citação: rola até ela assim que está na tela (ela pode ter
+  // acabado de chegar numa página do histórico, e então o efeito abaixo a acha depois da renderização).
+  const pendingScroll = useRef<string | null>(null);
+  const flushScroll = useCallback(() => {
+    const id = pendingScroll.current;
+    const element = id ? document.getElementById(`mensagem-${id}`) : null;
+    if (!element) return;
+    pendingScroll.current = null;
+    element.scrollIntoView?.({ block: "center" });
+    // O foco vai para a mensagem: quem usa teclado ou leitor de tela continua dali, e a barra de ações a destaca.
+    element.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => flushScroll(), [messages, flushScroll]);
+
+  // O que `goToMessage` lê no meio de uma espera: o estado de agora, e não o da renderização em que ele nasceu.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const messagesRef = useRef(messages);
+  const hasMoreRef = useRef(hasMore);
+  useEffect(() => {
+    messagesRef.current = messages;
+    hasMoreRef.current = hasMore;
+  });
+
+  /** Vai até a mensagem citada; se ela não está carregada, carrega o histórico página a página até achá-la (ou acabar). */
+  const goToMessage = useCallback(
+    async (id: string) => {
+      if (!messagesRef.current.some((m) => m.id === id)) {
+        let oldest = messagesRef.current[0]?.id;
+        let more = hasMoreRef.current;
+        let found = false;
+        setLoadingOlder(true);
+        try {
+          while (more && oldest && alive.current) {
+            const page = await fetchMessagePage(conversationId, oldest);
+            setMessages((current) => mergeMessages(current, page.mensagens));
+            more = page.tem_mais;
+            setHasMore(more);
+            if (page.mensagens.some((m) => m.id === id)) {
+              found = true;
+              break;
+            }
+            // Uma página vazia, ou que não anda para trás, encerra a busca em vez de repetir o mesmo pedido.
+            const next = page.mensagens[0]?.id;
+            if (!next || next === oldest) break;
+            oldest = next;
+          }
+        } catch {
+          // cai no aviso abaixo
+        } finally {
+          setLoadingOlder(false);
+        }
+        if (!found) {
+          toast.error("Não foi possível encontrar a mensagem citada");
+          return;
+        }
+      }
+      pendingScroll.current = id;
+      flushScroll();
+    },
+    [conversationId, flushScroll],
+  );
+
   const lastTypingSent = useRef(0);
   const sendTyping = () => {
     const now = Date.now();
@@ -145,13 +216,18 @@ export function ConversationPane({
         loadError={loadError}
         onLoadOlder={() => void loadOlder()}
         onAtBottomChange={setAtBottom}
+        onQuote={setQuote}
+        onGoToMessage={(id) => void goToMessage(id)}
       />
       <TypingIndicator text={typingText(typers, conversationId)} />
       <MessageComposer
         conversationId={conversationId}
         placeholder={placeholder}
+        quote={quote}
+        onCancelQuote={() => setQuote(null)}
         onSent={(message) => {
           setMessages((current) => mergeMessages(current, [message]));
+          setQuote(null);
           // A mensagem enviada encerra o "digitando": o da próxima não espera o intervalo.
           lastTypingSent.current = 0;
         }}

@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { ChatMessage, ReadCounts } from 'chat-events';
 import { DataSource, type EntityManager } from 'typeorm';
 import { v7 as uuidv7 } from 'uuid';
-import { MESSAGES_PER_PAGE } from '../config/values.js';
+import { MESSAGES_PER_PAGE, QUOTE_EXCERPT_MAX } from '../config/values.js';
 import { MentionEntity } from '../database/entities/mention.entity.js';
 import { MessageEntity } from '../database/entities/message.entity.js';
 import { AppError } from '../errors/app-error.js';
@@ -38,8 +38,12 @@ export class MessagesService {
     const conversation = await this.access.requireAccess(conversationId, personId);
     if (before !== undefined) await this.requireMessageOf(this.dataSource.manager, conversation.id, before, 'antes');
     const rows = await this.dataSource.query<MessageRow[]>(
-      `SELECT m.id, m.text, m.created_at, p.id AS author_id, p.name AS author_name, p.username AS author_username
+      `SELECT m.id, m.text, m.created_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
+              q.id AS quote_id, q.text AS quote_text, q.deleted_at AS quote_deleted_at,
+              qa.id AS quote_author_id, qa.name AS quote_author_name, qa.username AS quote_author_username
          FROM messages m JOIN people p ON p.id = m.author_id
+         LEFT JOIN messages q ON q.id = m.quoted_message_id
+         LEFT JOIN people qa ON qa.id = q.author_id
         WHERE m.conversation_id = $1
           AND ($2::uuid IS NULL OR (m.created_at, m.id) < (SELECT a.created_at, a.id FROM messages a WHERE a.id = $2))
         ORDER BY m.created_at DESC, m.id DESC
@@ -57,7 +61,7 @@ export class MessagesService {
    * cada mencionado, na mesma transação e num único comando (incremento no próprio `UPDATE`, sem ler antes). O evento
    * sai só depois do commit (ADR 0025).
    */
-  async send(conversationId: string, authorId: string, text: string): Promise<ChatMessage> {
+  async send(conversationId: string, authorId: string, text: string, quoteId?: string): Promise<ChatMessage> {
     const conversation = await this.access.requireAccess(conversationId, authorId);
     const everyone = await this.access.participantIds(conversation);
     // Ordem fixa: duas transações que somam nas mesmas linhas as travam na mesma ordem, sem impasse.
@@ -68,11 +72,13 @@ export class MessagesService {
     const createdAt = new Date();
 
     const { message, counts } = await this.dataSource.transaction(async (manager) => {
+      // A citada é lida e travada para compartilhar na transação: uma exclusão que chegue agora espera a mensagem entrar.
+      const quote = quoteId === undefined ? null : await this.requireQuotable(manager, conversation.id, quoteId);
       const [author] = await manager.query<{ name: string; username: string }[]>(
         `SELECT name, username FROM people WHERE id = $1`,
         [authorId],
       );
-      await manager.insert(MessageEntity, { id, conversationId: conversation.id, authorId, text, createdAt });
+      await manager.insert(MessageEntity, { id, conversationId: conversation.id, authorId, text, createdAt, quotedMessageId: quote?.id ?? null });
       if (mentioned.length > 0) {
         await manager.insert(MentionEntity, mentioned.map((mention) => ({ messageId: id, personId: mention.id, createdAt })));
       }
@@ -102,6 +108,7 @@ export class MessagesService {
         author_id: authorId,
         author_name: author!.name,
         author_username: author!.username,
+        ...quoteColumns(quote),
       }, mentioned);
       return { message, counts };
     });
@@ -163,6 +170,19 @@ export class MessagesService {
     return counts;
   }
 
+  /** A mensagem citada: da mesma conversa e ainda não apagada. Qualquer outra coisa é `dados_invalidos`, sem dizer qual. */
+  private async requireQuotable(manager: EntityManager, conversationId: string, quoteId: string): Promise<QuoteSource> {
+    const [row] = await manager.query<QuoteSource[]>(
+      `SELECT q.id, q.text, q.deleted_at, a.id AS author_id, a.name AS author_name, a.username AS author_username
+         FROM messages q JOIN people a ON a.id = q.author_id
+        WHERE q.id = $1 AND q.conversation_id = $2
+          FOR SHARE OF q`,
+      [quoteId, conversationId],
+    );
+    if (!row || row.deleted_at !== null) throw invalidField('citacao_id', 'A mensagem citada não existe nesta conversa.');
+    return row;
+  }
+
   private async requireMessageOf(manager: EntityManager, conversationId: string, messageId: string, field: string) {
     const found = await manager.query<{ id: string }[]>(
       `SELECT id FROM messages WHERE id = $1 AND conversation_id = $2`,
@@ -179,6 +199,53 @@ interface MessageRow {
   author_id: string;
   author_name: string;
   author_username: string;
+  quote_id?: string | null;
+  quote_text?: string | null;
+  quote_deleted_at?: Date | null;
+  quote_author_id?: string | null;
+  quote_author_name?: string | null;
+  quote_author_username?: string | null;
+}
+
+/** A mensagem citada como o banco a devolve ao conferir o envio. */
+interface QuoteSource {
+  id: string;
+  text: string;
+  deleted_at: Date | null;
+  author_id: string;
+  author_name: string;
+  author_username: string;
+}
+
+/** Os campos da citação no formato das linhas de mensagem. */
+const quoteColumns = (quote: QuoteSource | null): Partial<MessageRow> =>
+  quote
+    ? {
+        quote_id: quote.id,
+        quote_text: quote.text,
+        quote_deleted_at: quote.deleted_at,
+        quote_author_id: quote.author_id,
+        quote_author_name: quote.author_name,
+        quote_author_username: quote.author_username,
+      }
+    : {};
+
+/** O trecho da citação: até `QUOTE_EXCERPT_MAX` caracteres (de verdade, sem partir um emoji), com reticências se cortou. */
+function excerptOf(text: string): string {
+  const characters = Array.from(text);
+  return characters.length <= QUOTE_EXCERPT_MAX ? text : `${characters.slice(0, QUOTE_EXCERPT_MAX).join('')}…`;
+}
+
+function toQuote(row: MessageRow): ChatMessage['citacao'] {
+  if (!row.quote_id) return null;
+  const deleted = row.quote_deleted_at !== null && row.quote_deleted_at !== undefined;
+  return {
+    id: row.quote_id,
+    autor: { id: row.quote_author_id!, nome: row.quote_author_name!, usuario: row.quote_author_username! },
+    // O texto de uma mensagem apagada nunca sai pela citação.
+    trecho: deleted ? '' : excerptOf(row.quote_text ?? ''),
+    apagada: deleted,
+  };
 }
 
 interface CountRow {
@@ -197,8 +264,8 @@ function toChatMessage(conversationId: string, row: MessageRow, mencoes: Mention
     texto: row.text,
     criada_em: row.created_at.toISOString(),
     mencoes,
-    // Preenchidos pelas tarefas de citação, edição e exclusão da F1-05.
-    citacao: null,
+    citacao: toQuote(row),
+    // Preenchidos pelas tarefas de edição e exclusão da F1-05.
     editada_em: null,
     apagada: false,
   };

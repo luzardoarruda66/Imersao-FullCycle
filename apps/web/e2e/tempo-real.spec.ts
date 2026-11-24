@@ -10,6 +10,8 @@ async function send(page: Page, text: string) {
   await field.fill(text);
   await field.press("Enter");
   await expect(page.getByText(text, { exact: true })).toBeVisible();
+  // O campo só é limpo quando a Server Action volta: sem esperar, o próximo `fill` seria apagado por ela.
+  await expect(field).toHaveValue("");
 }
 
 test.describe("Tempo real e não lidas", () => {
@@ -24,6 +26,11 @@ test.describe("Tempo real e não lidas", () => {
     await expect(bia.getByRole("link", { name: other })).toBeVisible();
     await bia.getByRole("link", { name }).click();
     await ana.getByRole("link", { name }).click();
+    // As duas páginas precisam estar abertas e inscritas no tempo real antes de a primeira mensagem sair.
+    await expect(bia.getByRole("heading", { level: 1, name })).toBeVisible();
+    await expect(ana.getByRole("heading", { level: 1, name })).toBeVisible();
+    await expect(bia.getByRole("textbox", { name: /^Mensagem para/ })).toBeVisible();
+    await expect(ana.getByRole("textbox", { name: /^Mensagem para/ })).toBeVisible();
 
     // 1. A mensagem de Ana chega para Bia, sem recarregar.
     await send(ana, "olá, Bia");
@@ -37,9 +44,13 @@ test.describe("Tempo real e não lidas", () => {
 
     // 3. Mensagem num canal fechado: o selo aparece na lateral e some ao abrir.
     await ana.getByRole("link", { name: other }).click();
+    // Sem esperar a troca de página, a mensagem sairia no canal que ainda está aberto.
+    await expect(ana.getByRole("heading", { level: 1, name: other })).toBeVisible();
     await send(ana, "para quem está no outro canal");
-    await expect(bia.getByRole("link", { name: `${other}, 1 não lida` })).toBeVisible();
-    await bia.getByRole("link", { name: `${other}, 1 não lida` }).click();
+    // O nome acessível é o nome da conversa mais o texto só para leitor de tela (o navegador pode pôr um espaço entre eles).
+    const unreadLink = bia.getByRole("link", { name: new RegExp(`^${other}\\s*,\\s*1 não lida$`) });
+    await expect(unreadLink).toBeVisible();
+    await unreadLink.click();
     await expect(bia.getByRole("link", { name: other, exact: true })).toBeVisible();
 
     await Promise.all([ana, bia].map((page) => page.context().close()));

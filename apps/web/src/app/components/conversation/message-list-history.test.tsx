@@ -20,6 +20,14 @@ function metrics(log: HTMLElement, { scrollHeight, clientHeight, scrollTop }: { 
 
 const base = { intro: null, hasMore: false, loadingOlder: false, loadError: false, onLoadOlder: () => {}, onAtBottomChange: () => {} };
 
+describe("MessageList: teclado", () => {
+  it("a região de mensagens rola e por isso é alcançável pelo teclado", async () => {
+    render(<MessageList {...base} messages={[msg("m1", 0)]} />);
+    await userEvent.tab();
+    expect(screen.getByRole("log", { name: "Mensagens" })).toHaveFocus();
+  });
+});
+
 describe("MessageList: histórico", () => {
   it("mostra Início da conversa quando não há mais mensagens", () => {
     render(<MessageList {...base} messages={[msg("m1", 0)]} />);

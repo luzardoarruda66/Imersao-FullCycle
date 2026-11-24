@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationList } from "./conversations";
-import { badgeLabel, badgeText, setCounts } from "./unread";
+import { badgeLabel, badgeSuffix, badgeText, setCounts } from "./unread";
 
 describe("badgeText", () => {
   it.each([
@@ -11,6 +11,17 @@ describe("badgeText", () => {
     [1500, "99+"],
   ])("%i vira %s", (count, text) => {
     expect(badgeText(count)).toBe(text);
+  });
+});
+
+describe("badgeSuffix", () => {
+  it("é o que se acrescenta ao nome para o leitor de tela dizer as contagens", () => {
+    expect(badgeSuffix(3, 0)).toBe(", 3 não lidas");
+    expect(badgeSuffix(1, 2)).toBe(", 1 não lida, 2 menções");
+    expect(badgeSuffix(0, 1)).toBe(", 1 menção");
+  });
+  it("é vazio quando não há nada", () => {
+    expect(badgeSuffix(0, 0)).toBe("");
   });
 });
 

@@ -4,7 +4,7 @@ import { Hash, Lock, Plus, SquarePen } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import useSWR, { SWRConfig } from "swr";
+import useSWR from "swr";
 import { CreateChannelDialog } from "@/app/components/conversation/create-channel-dialog";
 import { PeopleSearchDialog } from "@/app/components/conversation/people-search-dialog";
 import { ConnectionIndicator } from "@/app/components/realtime/connection-indicator";
@@ -15,7 +15,7 @@ import { cn } from "@/app/utils/cn";
 import { conversationPath, type ConversationList, type ConversationListItem } from "@/lib/conversations";
 import { isReadingConversation } from "@/lib/open-conversation";
 import { getRealtimeClient } from "@/lib/realtime/realtime";
-import { badgeLabel, setCounts } from "@/lib/unread";
+import { badgeSuffix, setCounts } from "@/lib/unread";
 
 const ROW = "flex h-7 w-full items-center gap-2 rounded-item px-2 text-body transition-colors duration-100";
 
@@ -27,8 +27,6 @@ function ConversationLink({ conversation }: { conversation: ConversationListItem
     <Link
       href={conversationPath(conversation.id)}
       aria-current={active ? "page" : undefined}
-      // Os selos são só visuais: o nome acessível diz o nome da conversa e as contagens por extenso.
-      aria-label={unread ? badgeLabel(conversation.nome, conversation.nao_lidas, conversation.mencoes) : undefined}
       className={cn(
         ROW,
         active ? "bg-sidebar-active text-sidebar-on-active" : "text-sidebar-fg hover:bg-sidebar-hover",
@@ -36,7 +34,11 @@ function ConversationLink({ conversation }: { conversation: ConversationListItem
       )}
     >
       {conversation.tipo === "direta" ? <Avatar name={conversation.nome} size="xs" /> : <Icon size={16} aria-hidden />}
-      <span className="min-w-0 flex-1 truncate">{conversation.nome}</span>
+      {/* Os selos são só visuais; o texto `sr-only` diz as contagens por extenso e faz parte do nome acessível (não é `aria-label`, que contrariaria o texto visível: WCAG 2.5.3). */}
+      <span className="min-w-0 flex-1 truncate">
+        {conversation.nome}
+        <span className="sr-only">{badgeSuffix(conversation.nao_lidas, conversation.mencoes)}</span>
+      </span>
       <CountBadge count={conversation.mencoes} tone="mention" />
       <CountBadge count={conversation.nao_lidas} />
     </Link>
@@ -105,16 +107,7 @@ function useConversationList(initial: ConversationList | null) {
 }
 
 /** Lateral da casca (component `Sidebar`): canais públicos e privados, conversas diretas e as ações de criar e de buscar pessoas. */
-export function Sidebar(props: { list: ConversationList | null }) {
-  // Cache próprio de cada lateral montada: nada vaza entre uma casca e outra.
-  return (
-    <SWRConfig value={{ provider: () => new Map() }}>
-      <SidebarContent {...props} />
-    </SWRConfig>
-  );
-}
-
-function SidebarContent({ list: serverList }: { list: ConversationList | null }) {
+export function Sidebar({ list: serverList }: { list: ConversationList | null }) {
   const list = useConversationList(serverList);
   const pathname = usePathname();
   const router = useRouter();

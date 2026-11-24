@@ -140,7 +140,16 @@ export function MessageList({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div ref={scroller} role="log" aria-label="Mensagens" aria-live="polite" onScroll={handleScroll} className="flex-1 overflow-y-auto">
+      {/* `tabIndex`: a região rola, e quem usa só o teclado precisa chegar nela para ler o histórico (axe: scrollable-region-focusable). */}
+      <div
+        ref={scroller}
+        role="log"
+        aria-label="Mensagens"
+        aria-live="polite"
+        tabIndex={0}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto"
+      >
         <div className="flex min-h-full flex-col justify-end py-4">
           {messages.length === 0 ? (
             intro

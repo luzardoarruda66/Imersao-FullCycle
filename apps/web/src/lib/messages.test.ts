@@ -1,5 +1,5 @@
 import type { ChatMessage } from "chat-events";
-import { dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
+import { excerptOf, dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
 
 const message = (id: string, criadaEm: string, texto = id): ChatMessage => ({
   id,
@@ -71,5 +71,17 @@ describe("groupByDay", () => {
 
   it("devolve nada para nenhuma mensagem", () => {
     expect(groupByDay([], new Date())).toEqual([]);
+  });
+});
+
+describe("excerptOf", () => {
+  it("deixa o texto até 140 caracteres como está e corta o maior, com reticências", () => {
+    expect(excerptOf("curto")).toBe("curto");
+    expect(excerptOf("b".repeat(140))).toBe("b".repeat(140));
+    expect(excerptOf("a".repeat(141))).toBe(`${"a".repeat(140)}…`);
+  });
+
+  it("conta caracteres de verdade, sem partir um emoji", () => {
+    expect(excerptOf("😀".repeat(150))).toBe(`${"😀".repeat(140)}…`);
   });
 });

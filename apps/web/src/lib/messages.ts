@@ -9,6 +9,15 @@ export function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): 
   );
 }
 
+/** O tamanho do trecho de uma citação, em caracteres (LLD, "Valores e configuração"): é o mesmo da API. */
+export const QUOTE_EXCERPT_MAX = 140;
+
+/** O trecho que a citação mostra: até 140 caracteres de verdade (sem partir um emoji), com reticências se cortou. */
+export function excerptOf(text: string): string {
+  const characters = Array.from(text);
+  return characters.length <= QUOTE_EXCERPT_MAX ? text : `${characters.slice(0, QUOTE_EXCERPT_MAX).join("")}…`;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" });

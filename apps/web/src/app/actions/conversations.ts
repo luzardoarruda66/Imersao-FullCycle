@@ -33,6 +33,8 @@ export type SendMessageState =
   | { status: "sent"; message: ChatMessage }
   | { status: "error"; message: string };
 
+const QUOTE_GONE = "A mensagem citada não está mais disponível. Cancele a citação ou escolha outra mensagem. O texto foi mantido.";
+
 const text = (data: FormData, key: string) => {
   const value = data.get(key);
   return typeof value === "string" ? value : "";
@@ -118,15 +120,21 @@ export async function sendMessageAction(
   _previous: SendMessageState,
   formData: FormData,
 ): Promise<SendMessageState> {
-  const parsed = sendMessageSchema.safeParse({ texto: text(formData, "texto") });
-  if (!parsed.success) return { status: "error", message: fieldErrorsOf<"texto">(parsed.error).texto ?? "Escreva uma mensagem." };
+  const parsed = sendMessageSchema.safeParse({ texto: text(formData, "texto"), citacaoId: text(formData, "citacao_id") });
+  if (!parsed.success) {
+    const errors = fieldErrorsOf<"texto" | "citacaoId">(parsed.error);
+    return { status: "error", message: errors.texto ?? (errors.citacaoId ? QUOTE_GONE : "Escreva uma mensagem.") };
+  }
+  const quoteId = parsed.data.citacaoId;
 
   const result = await callChatApi<ChatMessage>(`/v1/conversas/${encodeURIComponent(conversationId)}/mensagens`, {
     method: "POST",
-    body: { texto: parsed.data.texto },
+    body: quoteId ? { texto: parsed.data.texto, citacao_id: quoteId } : { texto: parsed.data.texto },
   });
   if (result.kind === "ok") return { status: "sent", message: result.data };
   if (result.kind === "invalid-session") return endSession();
+  // A API só recusa o envio por dados inválidos quando a mensagem citada deixou de existir ou foi apagada.
+  if (quoteId && result.kind === "error" && result.code === "dados_invalidos") return { status: "error", message: QUOTE_GONE };
   const fallback = "Não foi possível enviar a mensagem. Verifique a conexão e tente de novo. O texto foi mantido.";
   return { status: "error", message: result.kind === "error" ? conversationErrorMessage(result.code, fallback) : fallback };
 }

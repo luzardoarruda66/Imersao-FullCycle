@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChatMessage } from "chat-events";
-import { ArrowDown, Copy } from "lucide-react";
+import { ArrowDown, Copy, CornerUpLeft } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessageActions, type MessageAction } from "@/app/components/conversation/message-actions";
@@ -9,6 +9,7 @@ import { MessageText } from "@/app/components/conversation/message-text";
 import { Avatar } from "@/app/components/ui/avatar";
 import { Button } from "@/app/components/ui/button";
 import { Spinner } from "@/app/components/ui/spinner";
+import { cn } from "@/app/utils/cn";
 import { useMounted } from "@/app/utils/use-mounted";
 import { copyText } from "@/lib/clipboard";
 import { formatTime, groupByDay } from "@/lib/messages";
@@ -19,9 +20,10 @@ const BOTTOM_SLACK = 24;
 const TOP_TRIGGER = 48;
 
 /** As ações da mensagem, na ordem da barra e do menu. A mensagem apagada não tem nenhuma. */
-function actionsOf(message: ChatMessage): MessageAction[] {
+function actionsOf(message: ChatMessage, onQuote?: (message: ChatMessage) => void): MessageAction[] {
   if (message.apagada) return [];
   return [
+    ...(onQuote ? [{ id: "quote", label: "Citar", icon: CornerUpLeft, onSelect: () => onQuote(message) }] : []),
     {
       id: "copy",
       label: "Copiar texto",
@@ -34,9 +36,44 @@ function actionsOf(message: ChatMessage): MessageAction[] {
   ];
 }
 
-function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessage; mounted: boolean; currentMemberId?: string }) {
+/** A mensagem que esta cita: autor e trecho, e leva até a original. Se a original foi apagada, só avisa. */
+function QuoteLink({ quote, onGoTo }: { quote: NonNullable<ChatMessage["citacao"]>; onGoTo?: (id: string) => void }) {
+  const content = (
+    <>
+      <CornerUpLeft size={12} aria-hidden className="shrink-0" />
+      <span className="shrink-0 font-bold">{quote.autor.nome}</span>
+      <span className="truncate">{quote.apagada ? "Mensagem apagada" : quote.trecho}</span>
+    </>
+  );
+  const style = "flex min-w-0 items-center gap-1 pb-0.5 text-small text-fg-muted";
+  if (quote.apagada) return <p className={style}>{content}</p>;
   return (
-    <li className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
+    <button
+      type="button"
+      aria-label={`Ir para a mensagem de ${quote.autor.nome}: ${quote.trecho}`}
+      onClick={() => onGoTo?.(quote.id)}
+      className={cn(style, "w-full cursor-pointer text-left hover:text-fg hover:underline")}
+    >
+      {content}
+    </button>
+  );
+}
+
+function MessageItem({
+  message,
+  mounted,
+  currentMemberId,
+  onQuote,
+  onGoToMessage,
+}: {
+  message: ChatMessage;
+  mounted: boolean;
+  currentMemberId?: string;
+  onQuote?: (message: ChatMessage) => void;
+  onGoToMessage?: (id: string) => void;
+}) {
+  return (
+    <li id={`mensagem-${message.id}`} className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
       <Avatar name={message.autor.nome} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline gap-2">
@@ -46,6 +83,7 @@ function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessa
             {mounted ? formatTime(new Date(message.criada_em)) : ""}
           </time>
         </div>
+        {message.citacao && <QuoteLink quote={message.citacao} onGoTo={onGoToMessage} />}
         {message.apagada ? (
           <p className="text-body text-fg-muted">Mensagem apagada</p>
         ) : (
@@ -54,7 +92,7 @@ function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessa
           </p>
         )}
       </div>
-      <MessageActions actions={actionsOf(message)} />
+      <MessageActions actions={actionsOf(message, onQuote)} />
     </li>
   );
 }
@@ -114,6 +152,8 @@ export function MessageList({
   onLoadOlder = () => {},
   onAtBottomChange = () => {},
   currentMemberId,
+  onQuote,
+  onGoToMessage,
 }: {
   messages: ChatMessage[];
   intro: React.ReactNode;
@@ -124,6 +164,10 @@ export function MessageList({
   onAtBottomChange?: (atBottom: boolean) => void;
   /** O membro da sessão: a menção a ele ganha a cor própria. */
   currentMemberId?: string;
+  /** Escolher "Citar" numa mensagem; sem isto, a ação não aparece. */
+  onQuote?: (message: ChatMessage) => void;
+  /** Clicar na citação: ir até a mensagem original. */
+  onGoToMessage?: (id: string) => void;
 }) {
   const mounted = useMounted();
   const scroller = useRef<HTMLDivElement>(null);
@@ -197,7 +241,14 @@ export function MessageList({
                   )}
                   <ul>
                     {group.messages.map((message) => (
-                      <MessageItem key={message.id} message={message} mounted={mounted} currentMemberId={currentMemberId} />
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        mounted={mounted}
+                        currentMemberId={currentMemberId}
+                        onQuote={onQuote}
+                        onGoToMessage={onGoToMessage}
+                      />
                     ))}
                   </ul>
                 </section>

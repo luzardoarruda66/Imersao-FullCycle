@@ -1,6 +1,7 @@
 import type { ChatEvent, ChatMessage } from "chat-events";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { markReadAction, sendMessageAction } from "@/app/actions/conversations";
 import { fetchMessagePage } from "@/lib/reading";
 import { ConversationPane } from "./conversation-pane";
@@ -22,6 +23,7 @@ vi.mock("@/lib/realtime/realtime", () => ({
 vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
 vi.mock("@/lib/reading", async (original) => ({ ...(await original<typeof import("@/lib/reading")>()), fetchMessagePage: vi.fn() }));
 
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const read = vi.mocked(markReadAction);
 const fetchPage = vi.mocked(fetchMessagePage);
 
@@ -57,6 +59,91 @@ const pane = (initial: ChatMessage[], hasMore = false) => (
 
 const setVisibility = (state: "visible" | "hidden") =>
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+
+describe("ConversationPane: citação", () => {
+  const scrollIntoView = vi.fn();
+  const at = (n: number, extra: Partial<ChatMessage> = {}) =>
+    message(`m${n}`, `texto ${n}`, "c1", `2026-11-24T10:0${n}:00.000Z`, "p1") && { ...message(`m${n}`, `texto ${n}`, "c1", `2026-11-24T10:0${n}:00.000Z`), ...extra };
+  const quoteOf = (id: string) => ({ id, autor: { id: "p1", nome: "Ana", usuario: "ana" }, trecho: `texto ${id.slice(1)}`, apagada: false });
+  const sendAction = vi.mocked(sendMessageAction);
+
+  beforeEach(() => {
+    for (const key of Object.keys(handlers)) delete handlers[key];
+    fetchPage.mockReset();
+    scrollIntoView.mockReset();
+    sendAction.mockReset();
+    vi.mocked(toast.error).mockClear();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    setVisibility("visible");
+  });
+
+  it("Citar mostra o contexto sobre o campo, o envio leva o citacao_id e a citação some depois de enviar", async () => {
+    const user = userEvent.setup();
+    const sentMessage = at(2, { citacao: quoteOf("m1"), texto: "resposta" });
+    sendAction.mockResolvedValue({ status: "sent", message: sentMessage });
+    render(pane([at(1)]));
+    await user.click(screen.getByRole("button", { name: "Citar" }));
+    expect(screen.getByRole("group", { name: "Citação" })).toHaveTextContent("Citando Ana");
+    await user.type(screen.getByRole("textbox", { name: "Mensagem para #geral" }), "resposta{Enter}");
+    expect(Object.fromEntries(sendAction.mock.calls[0]![2])).toEqual({ texto: "resposta", citacao_id: "m1" });
+    expect(await screen.findByText("resposta")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Citação" })).not.toBeInTheDocument();
+  });
+
+  it("cancelar tira a citação, e uma nova escolha troca a anterior", async () => {
+    const user = userEvent.setup();
+    render(pane([at(1), at(2)]));
+    await user.click(screen.getAllByRole("button", { name: "Citar" })[0]!);
+    await user.click(screen.getByRole("button", { name: "Cancelar citação" }));
+    expect(screen.queryByRole("group", { name: "Citação" })).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Citar" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "Citar" })[1]!);
+    expect(screen.getAllByRole("group", { name: "Citação" })).toHaveLength(1);
+    expect(screen.getByRole("group", { name: "Citação" })).toHaveTextContent("texto 2");
+  });
+
+  it("clicar na citação de uma mensagem já carregada rola até ela, sem buscar nada", async () => {
+    render(pane([at(1), at(2, { citacao: quoteOf("m1") })]));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById("mensagem-m1"));
+  });
+
+  it("se a original não está carregada, carrega o histórico página a página até achá-la e rola até ela", async () => {
+    fetchPage
+      .mockResolvedValueOnce({ mensagens: [at(3), at(4)], tem_mais: true })
+      .mockResolvedValueOnce({ mensagens: [at(1), at(2)], tem_mais: false });
+    render(pane([at(5, { citacao: quoteOf("m1") })], true));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(fetchPage.mock.calls.map((call) => call[1])).toEqual(["m5", "m3"]);
+    expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById("mensagem-m1"));
+  });
+
+  it("para ao achar a original, sem puxar as páginas seguintes", async () => {
+    fetchPage.mockResolvedValueOnce({ mensagens: [at(1), at(2), at(3), at(4)], tem_mais: true });
+    render(pane([at(5, { citacao: quoteOf("m2") })], true));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("avisa quando o histórico acaba sem a original, ou quando a busca falha", async () => {
+    fetchPage.mockResolvedValueOnce({ mensagens: [at(3), at(4)], tem_mais: false });
+    const { unmount } = render(pane([at(5, { citacao: quoteOf("m1") })], true));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível encontrar a mensagem citada"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    unmount();
+
+    vi.mocked(toast.error).mockClear();
+    fetchPage.mockRejectedValueOnce(new Error("rede"));
+    render(pane([at(5, { citacao: quoteOf("m1") })], true));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível encontrar a mensagem citada"));
+  });
+});
 
 describe("ConversationPane", () => {
   beforeEach(() => {

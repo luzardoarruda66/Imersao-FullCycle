@@ -169,6 +169,28 @@ describe('Conversas (e2e HTTP)', () => {
     });
   });
 
+  describe('ids em maiúsculas', () => {
+    it('a conversa direta consigo mesmo é recusada, e a do par não duplica, mesmo com o id em maiúsculas', async () => {
+      const self = await as(t, ana.sid).post('/v1/conversas/diretas', { membro_id: ana.id.toUpperCase() });
+      expect(self.status).toBe(422);
+      expect(self.body.error.code).toBe('conversa_direta_consigo_mesmo');
+      const lower = await as(t, ana.sid).post('/v1/conversas/diretas', { membro_id: bia.id });
+      const upper = await as(t, ana.sid).post('/v1/conversas/diretas', { membro_id: bia.id.toUpperCase() });
+      expect(upper.status).toBe(200);
+      expect(upper.body.id).toBe(lower.body.id);
+      const rows = await t.dataSource.query(`SELECT count(*)::int AS n FROM conversations WHERE type = 'direta'`);
+      expect(rows[0].n).toBe(1);
+    });
+
+    it('o convite com o id em maiúsculas não duplica quem já participa', async () => {
+      const id = await idOf(ana, 'fechado', 'privado');
+      await as(t, ana.sid).post(`/v1/conversas/${id}/participantes`, { membros_ids: [bia.id] });
+      const res = await as(t, ana.sid).post(`/v1/conversas/${id}/participantes`, { membros_ids: [bia.id.toUpperCase(), ana.id.toUpperCase()] });
+      expect(res.status).toBe(200);
+      expect(res.body.participantes).toHaveLength(2);
+    });
+  });
+
   describe('membros', () => {
     it('lista só id e nome, em ordem alfabética', async () => {
       const res = await as(t, ana.sid).get('/v1/membros');

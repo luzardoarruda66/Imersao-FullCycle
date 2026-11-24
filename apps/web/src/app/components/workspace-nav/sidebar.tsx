@@ -128,15 +128,3 @@ export function Sidebar({ list, members }: { list: ConversationList | null; memb
     </aside>
   );
 }
-
-/** Esqueleto da lateral enquanto a lista carrega (frame `Canais / Lista / Carregando`). */
-export function SidebarSkeleton() {
-  return (
-    <aside aria-label="Conversas" aria-busy="true" className="flex w-sidebar shrink-0 flex-col gap-2 bg-sidebar px-4 py-4">
-      <span className="text-title font-black text-sidebar-fg-strong">Full Cycle</span>
-      {[40, 60, 50, 70, 45].map((width) => (
-        <div key={width} className="h-3 animate-pulse rounded-control bg-sidebar-field" style={{ width: `${width}%` }} />
-      ))}
-    </aside>
-  );
-}

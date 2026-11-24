@@ -7,10 +7,16 @@ export const createChannelSchema = z.object({
 });
 export type CreateChannelDto = z.infer<typeof createChannelSchema>;
 
-export const openDirectSchema = z.object({ membro_id: z.uuid() });
+/**
+ * O Postgres aceita o UUID em qualquer caixa, mas a comparação e a chave do par (`directKey`) são de texto:
+ * o id entra em minúsculas, a forma que a API devolve.
+ */
+const memberId = z.uuid().transform((value) => value.toLowerCase());
+
+export const openDirectSchema = z.object({ membro_id: memberId });
 export type OpenDirectDto = z.infer<typeof openDirectSchema>;
 
-export const inviteSchema = z.object({ membros_ids: z.array(z.uuid()).min(1).max(INVITE_MAX) });
+export const inviteSchema = z.object({ membros_ids: z.array(memberId).min(1).max(INVITE_MAX) });
 export type InviteDto = z.infer<typeof inviteSchema>;
 
 export const sendMessageSchema = z.object({ texto: z.string().trim().min(1).max(MESSAGE_TEXT_MAX) });

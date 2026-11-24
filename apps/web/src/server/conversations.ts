@@ -3,6 +3,7 @@ import type { ReadCounts } from "chat-events";
 import { cache } from "react";
 import type { ApiResult } from "@/lib/chat-api-response";
 import type { ConversationDetail, ConversationList, MemberOption } from "@/lib/conversations";
+import type { PersonSummary } from "@/lib/people";
 import type { MessagePage } from "@/lib/reading";
 import { callChatApi } from "./chat-api";
 
@@ -38,4 +39,11 @@ export async function markConversationRead(id: string, messageId: string): Promi
     method: "POST",
     body: { mensagem_id: messageId },
   });
+}
+
+/** Os participantes da conversa que a pessoa pode mencionar, filtrados por parte do nome ou do @usuário. */
+export async function getMentionable(id: string, term: string): Promise<ApiResult<{ pessoas: PersonSummary[] }>> {
+  return callChatApi<{ pessoas: PersonSummary[] }>(
+    `/v1/conversas/${encodeURIComponent(id)}/mencionaveis?busca=${encodeURIComponent(term)}`,
+  );
 }

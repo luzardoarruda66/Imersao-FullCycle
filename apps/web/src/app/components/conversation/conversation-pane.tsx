@@ -34,12 +34,14 @@ export function ConversationPane({
   initialMessages,
   initialHasMore,
   intro,
+  currentMemberId,
 }: {
   conversationId: string;
   placeholder: string;
   initialMessages: ChatMessage[];
   initialHasMore: boolean;
   intro: React.ReactNode;
+  currentMemberId?: string;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [seen, setSeen] = useState(initialMessages);
@@ -135,6 +137,7 @@ export function ConversationPane({
   return (
     <>
       <MessageList
+        currentMemberId={currentMemberId}
         messages={messages}
         intro={intro}
         hasMore={hasMore}

@@ -3,11 +3,12 @@
 import type { ChatMessage } from "chat-events";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { editMessageAction, markReadAction } from "@/app/actions/conversations";
+import { deleteMessageAction, editMessageAction, markReadAction } from "@/app/actions/conversations";
 import { MessageComposer } from "@/app/components/conversation/message-composer";
 import { MessageList } from "@/app/components/conversation/message-list";
+import { ConfirmDialog } from "@/app/components/ui/confirm-dialog";
 import { TypingIndicator } from "@/app/components/conversation/typing-indicator";
-import { applyEdit, mergeMessages } from "@/lib/messages";
+import { applyDelete, applyEdit, excerptOf, mergeMessages } from "@/lib/messages";
 import { setReadingConversation } from "@/lib/open-conversation";
 import { getRealtimeClient } from "@/lib/realtime/realtime";
 import { fetchMessagePage, nextReadTarget } from "@/lib/reading";
@@ -57,6 +58,8 @@ export function ConversationPane({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
+  // A mensagem que a pessoa pediu para apagar e está no diálogo de confirmação, com o estado do pedido.
+  const [deleting, setDeleting] = useState<{ message: ChatMessage; pending: boolean; error?: string } | null>(null);
   const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState === "visible");
   // O servidor releu a conversa (atualização da página, reconexão): junta o que veio com o que já estava na tela.
   if (initialMessages !== seen) {
@@ -77,6 +80,15 @@ export function ConversationPane({
       if (event.dados.conversa_id !== conversationId) return;
       setMessages((current) => applyEdit(current, event.dados.mensagem));
     });
+    const offDeleted = client.subscribe("mensagem_apagada", (event) => {
+      if (event.dados.conversa_id !== conversationId) return;
+      const id = event.dados.mensagem_id;
+      setMessages((current) => applyDelete(current, id));
+      // O que dependia da mensagem some junto: a citação no campo, o editor aberto e o pedido de confirmação.
+      setQuote((current) => (current?.id === id ? null : current));
+      setEditingId((current) => (current === id ? null : current));
+      setDeleting((current) => (current?.message.id === id ? null : current));
+    });
     const offTyping = client.subscribe("digitando", (event) => {
       if (event.dados.conversa_id !== conversationId) return;
       setTypers((current) => addTyper(current, conversationId, event.dados.pessoa, Date.now()));
@@ -84,6 +96,7 @@ export function ConversationPane({
     return () => {
       offMessages();
       offEdited();
+      offDeleted();
       offTyping();
     };
   }, [conversationId]);
@@ -230,6 +243,19 @@ export function ConversationPane({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    const { message } = deleting;
+    setDeleting({ message, pending: true });
+    const result = await deleteMessageAction(conversationId, message.id);
+    if (result.status === "deleted") {
+      setMessages((current) => applyDelete(current, message.id));
+      setDeleting(null);
+    } else {
+      setDeleting({ message, pending: false, error: result.message });
+    }
+  };
+
   const lastTypingSent = useRef(0);
   const sendTyping = () => {
     const now = Date.now();
@@ -251,8 +277,23 @@ export function ConversationPane({
         onAtBottomChange={setAtBottom}
         onQuote={setQuote}
         onEdit={startEdit}
+        onDelete={(message) => setDeleting({ message, pending: false })}
         editing={editingId ? { messageId: editingId, pending: editPending, error: editError, onSave: (text) => void saveEdit(editingId, text), onCancel: cancelEdit } : undefined}
         onGoToMessage={(id) => void goToMessage(id)}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title="Apagar mensagem?"
+        description="Ela some da conversa para todo mundo. Não dá para desfazer."
+        quote={deleting ? excerptOf(deleting.message.texto) : undefined}
+        confirmLabel="Apagar"
+        tone="destructive"
+        pending={deleting?.pending}
+        error={deleting?.error}
+        onConfirm={() => void confirmDelete()}
       />
       <TypingIndicator text={typingText(typers, conversationId)} />
       <MessageComposer

@@ -1,5 +1,5 @@
 import type { ChatMessage } from "chat-events";
-import { applyEdit, canEdit, EDIT_WINDOW_MS, excerptOf, dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
+import { applyDelete, applyEdit, canEdit, EDIT_WINDOW_MS, excerptOf, dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
 
 const message = (id: string, criadaEm: string, texto = id): ChatMessage => ({
   id,
@@ -159,5 +159,40 @@ describe("applyEdit", () => {
   it("não reescreve a citação de uma mensagem apagada", () => {
     const current = [base("m1", "antigo"), base("m2", "r", { citacao: quoteOf("m1", "", true) })];
     expect(applyEdit(current, base("m1", "novo"))[1]!.citacao).toEqual(quoteOf("m1", "", true));
+  });
+});
+
+describe("applyDelete", () => {
+  const base = (id: string, texto: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
+    id,
+    conversa_id: "c1",
+    autor: { id: "p1", nome: "Ana", usuario: "ana" },
+    texto,
+    criada_em: "2026-11-24T10:00:00.000Z",
+    mencoes: [{ id: "p2", usuario: "bia" }],
+    citacao: null,
+    editada_em: null,
+    apagada: false,
+    ...over,
+  });
+  const quoteOf = (id: string, trecho: string) => ({ id, autor: { id: "p1", nome: "Ana", usuario: "ana" }, trecho, apagada: false });
+
+  it("marca a mensagem como apagada, sem texto, menções nem citação, e deixa as outras como estão", () => {
+    const current = [base("m1", "segredo", { citacao: quoteOf("m0", "x") }), base("m2", "outra")];
+    const next = applyDelete(current, "m1");
+    expect(next[0]).toMatchObject({ id: "m1", texto: "", apagada: true, mencoes: [], citacao: null });
+    expect(next[1]).toBe(current[1]);
+  });
+
+  it("as citações carregadas à apagada passam a mostrar apagada, sem trecho", () => {
+    const current = [base("m1", "segredo"), base("m2", "resposta", { citacao: quoteOf("m1", "segredo") })];
+    expect(applyDelete(current, "m1")[1]!.citacao).toEqual({ ...quoteOf("m1", ""), apagada: true });
+  });
+
+  it("mensagem que não está carregada, ou já apagada, devolve a mesma lista; duas vezes dá o mesmo resultado", () => {
+    const current = [base("m1", "segredo")];
+    expect(applyDelete(current, "m9")).toBe(current);
+    const once = applyDelete(current, "m1");
+    expect(applyDelete(once, "m1")).toBe(once);
   });
 });

@@ -35,6 +35,27 @@ export function applyEdit(messages: ChatMessage[], edited: ChatMessage): ChatMes
   });
 }
 
+/**
+ * Aplica uma exclusão à lista: a mensagem vira "apagada", sem texto, menções nem citação, e as citações carregadas a
+ * ela passam a mostrar "apagada", sem trecho. Se nada na lista é afetado (a mensagem não está carregada, ou já estava
+ * apagada), devolve a mesma lista. Aplicar duas vezes dá o mesmo resultado.
+ */
+export function applyDelete(messages: ChatMessage[], id: string): ChatMessage[] {
+  let changed = false;
+  const next = messages.map((message) => {
+    if (message.id === id && !message.apagada) {
+      changed = true;
+      return { ...message, texto: "", mencoes: [], citacao: null, apagada: true };
+    }
+    if (message.citacao?.id === id && !message.citacao.apagada) {
+      changed = true;
+      return { ...message, citacao: { ...message.citacao, trecho: "", apagada: true } };
+    }
+    return message;
+  });
+  return changed ? next : messages;
+}
+
 /** O tamanho do trecho de uma citação, em caracteres (LLD, "Valores e configuração"): é o mesmo da API. */
 export const QUOTE_EXCERPT_MAX = 140;
 

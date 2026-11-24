@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChatMessage } from "chat-events";
-import { ArrowDown, Copy, CornerUpLeft, Pencil } from "lucide-react";
+import { ArrowDown, Copy, CornerUpLeft, Pencil, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessageEditor } from "@/app/components/conversation/message-editor";
@@ -24,11 +24,15 @@ const TOP_TRIGGER = 48;
 /** As ações da mensagem, na ordem da barra e do menu. A mensagem apagada não tem nenhuma. */
 function actionsOf(
   message: ChatMessage,
-  handlers: { onQuote?: (message: ChatMessage) => void; onEdit?: (message: ChatMessage) => void },
+  handlers: {
+    onQuote?: (message: ChatMessage) => void;
+    onEdit?: (message: ChatMessage) => void;
+    onDelete?: (message: ChatMessage) => void;
+  },
   canEditNow: boolean,
 ): MessageAction[] {
   if (message.apagada) return [];
-  const { onQuote, onEdit } = handlers;
+  const { onQuote, onEdit, onDelete } = handlers;
   return [
     ...(onQuote ? [{ id: "quote", label: "Citar", icon: CornerUpLeft, onSelect: () => onQuote(message) }] : []),
     {
@@ -41,6 +45,10 @@ function actionsOf(
       },
     },
     ...(onEdit && canEditNow ? [{ id: "edit", label: "Editar", icon: Pencil, onSelect: () => onEdit(message) }] : []),
+    // Apagar só no menu: a barra tem os atalhos que não destroem nada.
+    ...(onDelete && canEditNow
+      ? [{ id: "delete", label: "Apagar", icon: Trash2, tone: "danger" as const, quick: false, onSelect: () => onDelete(message) }]
+      : []),
   ];
 }
 
@@ -85,6 +93,7 @@ function MessageItem({
   currentMemberId,
   onQuote,
   onEdit,
+  onDelete,
   editing,
   onGoToMessage,
 }: {
@@ -93,6 +102,7 @@ function MessageItem({
   currentMemberId?: string;
   onQuote?: (message: ChatMessage) => void;
   onEdit?: (message: ChatMessage) => void;
+  onDelete?: (message: ChatMessage) => void;
   editing?: EditingState;
   onGoToMessage?: (id: string) => void;
 }) {
@@ -123,7 +133,7 @@ function MessageItem({
           </p>
         )}
       </div>
-      {!isEditing && <MessageActions actions={actionsOf(message, { onQuote, onEdit }, canEditNow)} />}
+      {!isEditing && <MessageActions actions={actionsOf(message, { onQuote, onEdit, onDelete }, canEditNow)} />}
     </li>
   );
 }
@@ -185,6 +195,7 @@ export function MessageList({
   currentMemberId,
   onQuote,
   onEdit,
+  onDelete,
   editing,
   onGoToMessage,
 }: {
@@ -201,6 +212,8 @@ export function MessageList({
   onQuote?: (message: ChatMessage) => void;
   /** Escolher "Editar" numa mensagem do próprio membro, dentro do prazo; sem isto, a ação não aparece. */
   onEdit?: (message: ChatMessage) => void;
+  /** Escolher "Apagar" (só no menu) numa mensagem do próprio membro, dentro do prazo; sem isto, a ação não aparece. */
+  onDelete?: (message: ChatMessage) => void;
   /** A edição em andamento, se houver: a mensagem mostra o editor no lugar do texto. */
   editing?: EditingState;
   /** Clicar na citação: ir até a mensagem original. */
@@ -285,6 +298,7 @@ export function MessageList({
                         currentMemberId={currentMemberId}
                         onQuote={onQuote}
                         onEdit={onEdit}
+                        onDelete={onDelete}
                         editing={editing}
                         onGoToMessage={onGoToMessage}
                       />

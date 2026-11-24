@@ -354,7 +354,7 @@ de eventos do WebSocket estão a definir. O que já está decidido:
 | Evento `mensagem_criada` (WebSocket) | existe | Publicado depois do commit da mensagem, para quem vê a conversa ("Segurança"); leva o id da conversa e a mensagem completa |
 | Evento `conversa_visivel` (WebSocket) | existe | Publicado quando a pessoa passa a ver uma conversa: canal público novo (todos os membros), canal privado novo (o criador), conversa direta nova (os dois) e convite (só quem foi convidado de fato). Leva só o id da conversa; o `web` relê a lateral |
 | `GET /v1/pessoas` (API do chat) | planejada | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
-| `GET /v1/pessoas/:id` (API do chat) | planejada | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
+| `GET /v1/pessoas/:id` (API do chat) | existe | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
 | `GET /v1/conversas/:id/mensagens` (API do chat) | planejada | Ganha `antes` e `tem_mais` (convenção de paginação, acima) |
 | `POST /v1/conversas/:id/leitura` (API do chat) | planejada | Registra a leitura até uma mensagem da conversa, com sessão e pelo serviço de participação; devolve as contagens da conversa. Regras em "Concorrência e idempotência". Erros: `conversa_inexistente` (404), `dados_invalidos` (400, para mensagem de outra conversa) |
 | `GET /v1/conversas` (API do chat) | planejada | Passa a trazer `nao_lidas` e `mencoes` em cada conversa |
@@ -429,7 +429,7 @@ definir.
 | A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções zeradas até a F1-05) | — | planejada |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
-| `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | planejada |
+| `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | existe |
 | Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | planejada |
 | A definir | Sessão; conectar e desconectar só para administrador | Agentes e estado de conexão | Conectar e desconectar agente | a detalhar |
 

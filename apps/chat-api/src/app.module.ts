@@ -20,6 +20,7 @@ import { ConversationsModule } from './conversations/conversations.module.js';
 import { buildDataSourceOptions } from './database/data-source.js';
 import { AllExceptionsFilter } from './errors/all-exceptions.filter.js';
 import { LoginAttemptsModule } from './login-attempts/login-attempts.module.js';
+import { DirectoryModule } from './people/directory.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 
 @Module({
@@ -53,6 +54,7 @@ import { RealtimeModule } from './realtime/realtime.module.js';
     LoginAttemptsModule,
     AuthModule,
     ConversationsModule,
+    DirectoryModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

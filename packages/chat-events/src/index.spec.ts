@@ -67,6 +67,21 @@ describe('chat-events', () => {
     expect(chatMessageSchema.safeParse({ ...full, apagada: 'sim' }).success).toBe(false);
   });
 
+  it('valida o evento de mensagem editada, com a mensagem completa', () => {
+    const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
+    const mensagem = {
+      id: 'm1',
+      conversa_id: 'c1',
+      autor: { id: 'p1', nome: 'Ana', usuario: 'ana' },
+      texto: 'depois',
+      criada_em: '2026-11-24T00:00:00.000Z',
+      editada_em: '2026-11-24T00:01:00.000Z',
+    };
+    expect(chatEventSchema.parse({ ...base, tipo: 'mensagem_editada', dados: { conversa_id: 'c1', mensagem } }).tipo).toBe('mensagem_editada');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'mensagem_editada', dados: { conversa_id: 'c1' } }).success).toBe(false);
+    expect(isLiveOnly('mensagem_editada')).toBe(false);
+  });
+
   it('só o digitando é ao vivo; os outros eventos entram na reposição', () => {
     expect(isLiveOnly('digitando')).toBe(true);
     expect(isLiveOnly('mensagem_criada')).toBe(false);

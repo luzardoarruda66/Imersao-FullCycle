@@ -1,15 +1,17 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Member } from '../auth/member.js';
 import {
   createChannelSchema,
+  editMessageSchema,
   inviteSchema,
   listMessagesSchema,
   openDirectSchema,
   readSchema,
   sendMessageSchema,
   type CreateChannelDto,
+  type EditMessageDto,
   type InviteDto,
   type ListMessagesDto,
   type OpenDirectDto,
@@ -87,6 +89,17 @@ export class ConversationsController {
   @HttpCode(200)
   markRead(@Param('id') id: string, @Body({ schema: readSchema }) body: ReadDto, @CurrentUser('id') personId: string) {
     return this.messages.markRead(id, personId, body.mensagem_id);
+  }
+
+  @ApiOperation({ summary: 'Editar o texto da própria mensagem, até 4 horas depois do envio' })
+  @Patch(':id/mensagens/:mensagemId')
+  editMessage(
+    @Param('id') id: string,
+    @Param('mensagemId') messageId: string,
+    @Body({ schema: editMessageSchema }) body: EditMessageDto,
+    @CurrentUser('id') personId: string,
+  ) {
+    return this.messages.edit(id, personId, messageId, body.texto);
   }
 
   @ApiOperation({ summary: 'Enviar uma mensagem' })

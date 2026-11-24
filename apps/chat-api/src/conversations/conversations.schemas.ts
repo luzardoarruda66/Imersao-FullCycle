@@ -23,6 +23,10 @@ export type InviteDto = z.infer<typeof inviteSchema>;
 export const listMessagesSchema = z.object({ antes: memberId.optional() });
 export type ListMessagesDto = z.infer<typeof listMessagesSchema>;
 
+/** O texto novo da mensagem: as mesmas regras do envio. */
+export const editMessageSchema = z.object({ texto: z.string().trim().min(1).max(MESSAGE_TEXT_MAX) });
+export type EditMessageDto = z.infer<typeof editMessageSchema>;
+
 /** A mensagem até onde a pessoa leu. */
 export const readSchema = z.object({ mensagem_id: memberId });
 export type ReadDto = z.infer<typeof readSchema>;

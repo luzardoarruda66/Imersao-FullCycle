@@ -3,7 +3,8 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { ChatMessage, ReadCounts } from 'chat-events';
 import { DataSource, type EntityManager } from 'typeorm';
 import { v7 as uuidv7 } from 'uuid';
-import { MESSAGES_PER_PAGE, QUOTE_EXCERPT_MAX } from '../config/values.js';
+import { Clock } from '../clock.js';
+import { EDIT_WINDOW_MS, MESSAGES_PER_PAGE, QUOTE_EXCERPT_MAX } from '../config/values.js';
 import { MentionEntity } from '../database/entities/mention.entity.js';
 import { MessageEntity } from '../database/entities/message.entity.js';
 import { AppError } from '../errors/app-error.js';
@@ -17,6 +18,9 @@ export interface MessagePage {
   tem_mais: boolean;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const messageNotFound = () => new AppError('mensagem_inexistente', 404, 'Mensagem não encontrada.');
+
 const invalidField = (campo: string, mensagem: string) =>
   new AppError('dados_invalidos', 400, 'Dados inválidos.', { campos: [{ campo, mensagem }] });
 
@@ -27,6 +31,7 @@ export class MessagesService {
     private readonly access: ConversationAccessService,
     private readonly events: ConversationEvents,
     private readonly mentions: MentionsService,
+    private readonly clock: Clock,
   ) {}
 
   /**
@@ -38,7 +43,7 @@ export class MessagesService {
     const conversation = await this.access.requireAccess(conversationId, personId);
     if (before !== undefined) await this.requireMessageOf(this.dataSource.manager, conversation.id, before, 'antes');
     const rows = await this.dataSource.query<MessageRow[]>(
-      `SELECT m.id, m.text, m.created_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
+      `SELECT m.id, m.text, m.created_at, m.edited_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
               q.id AS quote_id, q.text AS quote_text, q.deleted_at AS quote_deleted_at,
               qa.id AS quote_author_id, qa.name AS quote_author_name, qa.username AS quote_author_username
          FROM messages m JOIN people p ON p.id = m.author_id
@@ -119,6 +124,82 @@ export class MessagesService {
   }
 
   /**
+   * Edita o texto da própria mensagem (LLD, "Concorrência e idempotência"). Só o autor, até `EDIT_WINDOW_MS` depois do
+   * envio, e nunca uma mensagem apagada. Texto igual ao gravado não muda nada nem publica. Quando muda, a mesma
+   * transação grava o texto e `edited_at`, recalcula as menções e ajusta `mencoes` só de quem ainda não leu a mensagem
+   * (quem leu já passou da posição que o contador conta). O evento sai só depois do commit (ADR 0025).
+   */
+  async edit(conversationId: string, personId: string, messageId: string, text: string): Promise<ChatMessage> {
+    const conversation = await this.access.requireAccess(conversationId, personId);
+    if (!UUID.test(messageId)) throw messageNotFound();
+    const everyone = await this.access.participantIds(conversation);
+
+    const changed = await this.dataSource.transaction(async (manager) => {
+      const [row] = await manager.query<{ text: string; created_at: Date; author_id: string; deleted_at: Date | null }[]>(
+        `SELECT text, created_at, author_id, deleted_at FROM messages WHERE id = $1 AND conversation_id = $2 FOR UPDATE`,
+        [messageId, conversation.id],
+      );
+      if (!row) throw messageNotFound();
+      if (row.author_id !== personId) throw new AppError('mensagem_de_outra_pessoa', 403, 'Só quem escreveu a mensagem pode editá-la.');
+      if (row.deleted_at !== null) throw new AppError('mensagem_apagada', 422, 'Esta mensagem foi apagada.');
+      if (this.clock.now() - row.created_at.getTime() > EDIT_WINDOW_MS) {
+        throw new AppError('prazo_encerrado', 422, 'O prazo para editar esta mensagem acabou.', { prazo_segundos: EDIT_WINDOW_MS / 1000 });
+      }
+      if (row.text === text) return null;
+
+      const mentioned = (await this.mentions.resolve(everyone, personId, text)).map((mention) => mention.id);
+      const stored = (await manager.query<{ person_id: string }[]>(`SELECT person_id FROM mentions WHERE message_id = $1`, [messageId])).map((r) => r.person_id);
+      const added = mentioned.filter((id) => !stored.includes(id)).sort();
+      const removed = stored.filter((id) => !mentioned.includes(id)).sort();
+
+      await manager.update(MessageEntity, messageId, { text, editedAt: new Date(this.clock.now()) });
+      if (added.length > 0) await manager.insert(MentionEntity, added.map((id) => ({ messageId, personId: id })));
+      if (removed.length > 0) await manager.query(`DELETE FROM mentions WHERE message_id = $1 AND person_id = ANY($2::uuid[])`, [messageId, removed]);
+
+      // Ordem fixa (sempre os que entram e depois os que saem, cada grupo ordenado): sem impasse com outra transação.
+      const counts = new Map<string, ReadCounts>();
+      for (const [ids, delta] of [[added, 1], [removed, -1]] as const) {
+        if (ids.length === 0) continue;
+        const updated = await manager.query<CountRow[]>(
+          `UPDATE conversation_read_states rs
+              SET mention_count = GREATEST(rs.mention_count + $4, 0), updated_at = now()
+            WHERE rs.conversation_id = $1 AND rs.person_id = ANY($2::uuid[])
+              AND (rs.last_read_message_id IS NULL
+                   OR (SELECT (c.created_at, c.id) FROM messages c WHERE c.id = rs.last_read_message_id)
+                    < (SELECT (a.created_at, a.id) FROM messages a WHERE a.id = $3))
+          RETURNING person_id, unread_count, mention_count`,
+          [conversation.id, ids, messageId, delta],
+        );
+        // O driver devolve `[linhas, quantidade]` no UPDATE ... RETURNING.
+        for (const r of (Array.isArray(updated[0]) ? updated[0] : updated) as CountRow[]) counts.set(r.person_id, toCounts(r));
+      }
+      return counts;
+    });
+
+    const message = await this.messageById(conversation.id, messageId);
+    if (changed === null) return message;
+    await this.events.messageEdited(conversation, message, everyone);
+    await Promise.all([...changed].map(([id, counts]) => this.events.readCountsChanged(id, conversation.id, counts)));
+    return message;
+  }
+
+  /** Uma mensagem no formato da API, com as menções e a citação. */
+  private async messageById(conversationId: string, messageId: string): Promise<ChatMessage> {
+    const [row] = await this.dataSource.query<MessageRow[]>(
+      `SELECT m.id, m.text, m.created_at, m.edited_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
+              q.id AS quote_id, q.text AS quote_text, q.deleted_at AS quote_deleted_at,
+              qa.id AS quote_author_id, qa.name AS quote_author_name, qa.username AS quote_author_username
+         FROM messages m JOIN people p ON p.id = m.author_id
+         LEFT JOIN messages q ON q.id = m.quoted_message_id
+         LEFT JOIN people qa ON qa.id = q.author_id
+        WHERE m.id = $1 AND m.conversation_id = $2`,
+      [messageId, conversationId],
+    );
+    const mentionsOf = await this.mentions.forMessages([messageId]);
+    return toChatMessage(conversationId, row!, mentionsOf.get(messageId) ?? []);
+  }
+
+  /**
    * Registra a leitura até a mensagem `messageId`. A posição só avança: uma igual ou anterior à gravada não muda
    * nada e não publica evento. Quando avança, a mesma transação grava a posição e recalcula `nao_lidas` como o
    * número de mensagens de outras pessoas depois dela (LLD, "Concorrência e idempotência").
@@ -196,6 +277,7 @@ interface MessageRow {
   id: string;
   text: string;
   created_at: Date;
+  edited_at?: Date | null;
   author_id: string;
   author_name: string;
   author_username: string;
@@ -265,8 +347,8 @@ function toChatMessage(conversationId: string, row: MessageRow, mencoes: Mention
     criada_em: row.created_at.toISOString(),
     mencoes,
     citacao: toQuote(row),
-    // Preenchidos pelas tarefas de edição e exclusão da F1-05.
-    editada_em: null,
+    editada_em: row.edited_at ? row.edited_at.toISOString() : null,
+    // Preenchido pela tarefa de exclusão da F1-05.
     apagada: false,
   };
 }

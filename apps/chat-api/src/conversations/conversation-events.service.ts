@@ -41,6 +41,11 @@ export class ConversationEvents {
     );
   }
 
+  /** `mensagem_editada` para cada participante, o autor inclusive (as outras abas dele). */
+  async messageEdited(conversation: Pick<ConversationEntity, 'id'>, message: ChatMessage, recipients: string[]) {
+    await this.publishAll(recipients, { tipo: 'mensagem_editada', dados: { conversa_id: conversation.id, mensagem: message } });
+  }
+
   /** A pessoa leu a conversa: as contagens novas vão para todas as abas dela. */
   readCountsChanged(personId: string, conversationId: string, counts: ReadCounts) {
     return this.publishAll([personId], {

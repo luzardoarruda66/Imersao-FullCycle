@@ -14,7 +14,7 @@
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
-| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `mensagem_criada`, `conversa_visivel`, `pronto` e `perdido` existem; os outros, com as funcionalidades que os emitem) |
+| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `mensagem_criada`, `conversa_visivel`, `pronto` e `perdido` existem; `contagem_atualizada` e `digitando`, planejados na F1-04; os outros, com as funcionalidades que os emitem) |
 | Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
@@ -199,10 +199,18 @@ novas tentativas e idempotência").
   gravado, sem nova mensagem, tarefa ou notificação.
 - **Contadores de não lidas e de menções:** um registro por pessoa e conversa, somado de forma
   atômica na transação da mensagem (incremento no próprio `UPDATE`, sem ler antes) e zerado quando
-  a pessoa lê ([ADR 0021](adr/0021-contadores-gravados.md); depende de mudança no HLD).
+  a pessoa lê ([ADR 0021](adr/0021-contadores-gravados.md)). A linha da pessoa na conversa nasce
+  na primeira mensagem de outra pessoa depois que ela passou a participar (no canal público,
+  participar é existir como membro do workspace), e nada é preenchido para trás: mensagem
+  anterior à linha nunca vira não lida. O autor da mensagem não soma contador para si.
 - **Última leitura:** só avança. A atualização é condicional: grava só se a nova posição for
-  posterior à gravada; uma posição igual ou anterior, vinda de uma aba atrasada, não muda nada e
-  não altera os contadores.
+  posterior à gravada; uma posição igual ou anterior, vinda de uma aba atrasada, não muda nada,
+  não altera os contadores e não publica evento.
+- **Contadores na leitura.** Quando a posição avança, a mesma transação recalcula `nao_lidas`
+  como o número de mensagens de outras pessoas depois da posição (zero quando ela é a última
+  mensagem) e `mencoes` como o número de menções à pessoa depois dela (sempre zero até a F1-05). O
+  `UPDATE` trava a linha, então a mensagem que está sendo gravada espera e entra na conta.
+  Uma leitura nunca deixa um contador negativo.
 
 ### Transações
 
@@ -277,7 +285,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 | Chat | Mensagens (texto, autor pessoa, conversa) | existe |
 | Chat | Mensagens: autor bot, citação e marca "dados de negócio" | a detalhar |
 | Chat | Menções | a detalhar |
-| Chat | Última leitura e contadores por pessoa e conversa | a detalhar |
+| Chat | Estado de leitura, por pessoa e conversa: posição de leitura (a última mensagem lida), contador de não lidas e contador de menções, nunca negativos. Regras em "Concorrência e idempotência" | planejada |
 | Chat | Notificações | a detalhar |
 | Chat | Tarefas | a detalhar |
 | Chat | Pedidos aos agentes e ações de bot | a detalhar |
@@ -302,11 +310,27 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
   chama o Serviço de agentes com a credencial de serviço; os bots chamam a API do chat com a
   credencial de bot e o identificador de pedido (forma em "Segurança").
 - Campos do JSON em `snake_case`, nas três APIs.
-- Paginação: a definir.
+- Paginação do histórico: por âncora, e não por deslocamento, para mensagem nova não deslocar a
+  página. `antes` recebe o id de uma mensagem da própria conversa; a resposta traz as mensagens em
+  ordem cronológica e `tem_mais`. Sem `antes`, devolve as mais recentes. Âncora que não é UUID ou
+  que não é da conversa: `dados_invalidos` (400). O tamanho é o `tamanho da página do histórico`.
+  A paginação das outras listas continua a definir.
 - Erros: "Conceitos transversais de implementação", seção "Erros".
 - Eventos do WebSocket: schemas Zod e tipos em `packages/chat-events/`, consumidos por `chat-api` e
   `web`. O WebSocket é Socket.IO só com o transporte WebSocket; o handshake usa o cookie `sid` e
   confere a origem contra `WEB_ORIGIN`. A recusa usa `sessao_invalida` ou `origem_invalida`.
+- Eventos da F1-04 (situação `planejada`), todos publicados depois do commit (ADR 0025), um por
+  pessoa: `mensagem_criada`, para cada participante, o autor inclusive, com a conversa, a
+  mensagem e as contagens da pessoa naquela conversa; `contagem_atualizada`, só para quem leu,
+  com as contagens novas; `digitando`, com a conversa e quem digita, para os outros
+  participantes. O `digitando` é só ao vivo: não entra nos eventos de reconexão do Redis, porque
+  repor um "digitando" velho seria mentira, e a publicação ganha uma variante sem guarda.
+- Mensagem do cliente ao servidor, `digitando`, com a conversa, validada pelo schema do pacote. O
+  gateway só a repassa a quem se registrou por tipo; o módulo de conversas confere a participação
+  (sem ela, ignora sem resposta), descarta a repetida da mesma pessoa e conversa em menos do
+  `intervalo mínimo entre "digitando"`, não repassa em conversa com mais membros que o
+  `limite de membros para o "digitando"` (no canal público, todos os membros do workspace) e
+  nunca o repassa a quem digita.
 
 **Índice das rotas**
 
@@ -331,6 +355,10 @@ de eventos do WebSocket estão a definir. O que já está decidido:
 | Evento `conversa_visivel` (WebSocket) | existe | Publicado quando a pessoa passa a ver uma conversa: canal público novo (todos os membros), canal privado novo (o criador), conversa direta nova (os dois) e convite (só quem foi convidado de fato). Leva só o id da conversa; o `web` relê a lateral |
 | `GET /v1/pessoas` (API do chat) | planejada | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
 | `GET /v1/pessoas/:id` (API do chat) | planejada | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
+| `GET /v1/conversas/:id/mensagens` (API do chat) | planejada | Ganha `antes` e `tem_mais` (convenção de paginação, acima) |
+| `POST /v1/conversas/:id/leitura` (API do chat) | planejada | Registra a leitura até uma mensagem da conversa, com sessão e pelo serviço de participação; devolve as contagens da conversa. Regras em "Concorrência e idempotência". Erros: `conversa_inexistente` (404), `dados_invalidos` (400, para mensagem de outra conversa) |
+| `GET /v1/conversas` (API do chat) | planejada | Passa a trazer `nao_lidas` e `mencoes` em cada conversa |
+| `GET /api/conversas/:id/mensagens` (BFF) | planejada | Repassa a página do histórico para o SWR do navegador |
 
 ## 6. Estados e regras
 
@@ -399,7 +427,7 @@ definir.
 | `/` (casca: Rail, lateral com as conversas e menu do usuário) | Sessão | O membro da sessão e a lista de conversas | Abrir conversa; criar canal; abrir conversa direta; trocar a própria senha, num diálogo; sair | existe |
 | `/conversas/[id]` | Sessão | A conversa e as `mensagens devolvidas por leitura` mais recentes | Enviar mensagem; ver os participantes e convidar, no canal privado | existe |
 | A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
-| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral | — | a detalhar |
+| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções zeradas até a F1-05) | — | planejada |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
 | `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | planejada |
 | Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | planejada |
@@ -411,6 +439,19 @@ atualiza esse cache direto, sem nova requisição. Na F1-02, o painel da convers
 em estado do próprio componente, sem SWR: junta a leitura do servidor, a mensagem que a pessoa enviou e o evento
 `mensagem_criada` sem repetir (pelo identificador), e o `conversa_visivel` faz o `web` reler a lateral. O SWR
 entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
+
+- **Mensagens.** `mensagem_criada` acrescenta ao fim da conversa carregada, ignorando um id já
+  presente (a resposta do envio e a reposição podem trazer a mesma), e grava as contagens na lista.
+  Para uma conversa não carregada, só a lista muda. Se a rolagem estava no fim, segue no fim; no
+  meio, não se move e a tela mostra "Novas mensagens". O histórico anterior carrega por página
+  quando a rolagem chega ao começo e também por botão, e para em `tem_mais` falso.
+- **Leitura.** Só a aba visível, com a conversa aberta e a rolagem no fim, registra a leitura da
+  última mensagem carregada, depois de uma espera curta para juntar mensagens seguidas. A conversa
+  nessas condições não mostra selo novo.
+- **"Digitando".** O campo manda `digitando` ao digitar, no máximo uma vez a cada `intervalo de envio
+  do "digitando"` e só com texto. O aviso, "@usuário está digitando" ou "Há N pessoas digitando...",
+  some em `tempo para o "digitando" sumir` sem novo evento ou quando chega a mensagem do autor, e
+  nunca mostra a própria pessoa.
 
 **Sessão no cliente.**
 
@@ -433,8 +474,9 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
   conexão por aba, com `withCredentials`, em `NEXT_PUBLIC_CHAT_WS_URL`. Guarda o último evento
   confirmado, manda-o a cada reconexão e entrega os eventos por tipo a quem se inscreveu; ignora o
   que já viu. No `perdido`, recarrega a página atual pelo histórico, sem erro técnico na tela. A
-  fábrica do socket é injetável, para o teste usar um socket falso. O indicador de conexão é da
-  F1-04.
+  fábrica do socket é injetável, para o teste usar um socket falso. Expõe também o estado da
+  conexão, que a casca mostra como "conectado" ou "reconectando" (F1-04, `planejada`), sem
+  "reconectando" na primeira conexão da página, anunciado por região `aria-live` educada.
 
 **Notificação do navegador.**
 
@@ -463,7 +505,11 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
 | Retenção dos eventos de reconexão | 15 minutos (PRD da FD-03) | API do chat (Redis) | Constante `RECONNECT_RETENTION_MS`, em `apps/chat-api/src/config/values.ts` |
 | Intervalo de conferência das sessões das conexões | 2 segundos; sustenta o fechamento em até 5 s (PRD da FD-03) | API do chat | Constante `SESSION_CHECK_INTERVAL_MS`, no mesmo arquivo |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
-| Tamanho da página do histórico | A definir (F1-04) | API do chat | A definir |
+| Tamanho da página do histórico | 50 mensagens, em ordem cronológica; vale também para a leitura sem âncora (as mais recentes) | API do chat | A definir |
+| Limite de membros para o "digitando" | 15; acima disso o aviso não é repassado nem mostrado (PRD da F1-04) | API do chat | A definir |
+| Tempo para o "digitando" sumir | 5 segundos sem novo evento (spec da F1-04) | `web` | A definir |
+| Intervalo de envio do "digitando" | No máximo um a cada 3 segundos por conversa, no campo de mensagem (spec da F1-04) | `web` | A definir |
+| Intervalo mínimo entre "digitando" | 1 segundo por pessoa e conversa; o repetido antes disso é ignorado (spec da F1-04) | API do chat | A definir |
 | Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | Constante `MESSAGES_PER_READ`, no mesmo arquivo |
 | Tamanho do nome do canal | 1 a 80 caracteres | API do chat e `web` | Constante `CHANNEL_NAME_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` (projetos independentes, [ADR 0017](adr/0017-projetos-pnpm-independentes.md)) |
 | Tamanho da mensagem | Até 4.000 caracteres | API do chat e `web` | Constante `MESSAGE_TEXT_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` |
@@ -557,13 +603,12 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Quem traduz exceção em resposta no Serviço de agentes.
 - [ ] Campos de correlação dos logs.
 - [ ] O que nunca vai para o log, além do que o HLD já diz.
-- [ ] Contadores quando a leitura avança até uma mensagem que não é a última da conversa.
 
 **Dados e interfaces**
 
 - [ ] Bots na mesma tabela das pessoas, ou não.
 - [ ] Diagrama de entidades e relações; forma das tabelas.
-- [ ] Paginação do histórico e das listas (a F1-02 devolve as 50 mais recentes; o cursor é da F1-04).
+- [ ] Paginação das listas além do histórico (o do histórico é por âncora, em "Interfaces").
 - [ ] Índice das rotas (BFF, API do chat para o BFF e para os bots, Serviço de agentes) e lista
       de eventos do WebSocket.
 
@@ -572,8 +617,7 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Subseções de "Estados e regras": pedido ao agente (estados; resposta a uma pergunta como
       pedido novo ou continuação), pergunta pendente (quando termina), mensagem (exclusão com
       menções, notificações e contadores; edição que acrescenta menção), consulta
-      a dados de negócio (comparação do lastro), limite de pedidos e teto de custo, presença e
-      "digitando".
+      a dados de negócio (comparação do lastro), limite de pedidos e teto de custo, presença.
 - [ ] Tarefa: concluir uma já concluída, ou reabrir uma aberta.
 - [ ] Idempotência da tarefa do PDF (chave no S3, entrega única) e outras rotinas (retenção dos
       PDFs, perguntas pendentes vencidas).

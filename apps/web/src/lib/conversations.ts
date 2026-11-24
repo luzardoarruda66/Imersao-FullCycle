@@ -8,6 +8,12 @@ export interface ConversationSummary {
   nome: string;
 }
 
+/** Um item da lista da lateral: a conversa com as contagens da pessoa. */
+export interface ConversationListItem extends ConversationSummary {
+  nao_lidas: number;
+  mencoes: number;
+}
+
 export interface Participant {
   id: string;
   nome: string;
@@ -19,9 +25,9 @@ export interface ConversationDetail extends ConversationSummary {
 }
 
 export interface ConversationList {
-  canais_publicos: ConversationSummary[];
-  canais_privados: ConversationSummary[];
-  diretas: ConversationSummary[];
+  canais_publicos: ConversationListItem[];
+  canais_privados: ConversationListItem[];
+  diretas: ConversationListItem[];
 }
 
 export interface MemberOption {

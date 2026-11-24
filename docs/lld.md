@@ -14,7 +14,7 @@
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
-| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `mensagem_criada`, `conversa_visivel`, `pronto` e `perdido` existem; `contagem_atualizada` e `digitando`, planejados na F1-04; os outros, com as funcionalidades que os emitem) |
+| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `mensagem_criada`, `conversa_visivel`, `pronto` e `perdido` existem, `contagem_atualizada` e `digitando` existem; os outros, com as funcionalidades que os emitem) |
 | Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
@@ -303,7 +303,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 | Chat | Mensagens: autor bot e marca "dados de negócio" | a detalhar |
 | Chat | Mensagens: `edited_at` (vazio até a primeira edição), `quoted_message_id` (opcional, mensagem da mesma conversa) e `deleted_at` (o texto é zerado ao apagar) | planejada |
 | Chat | Menções: uma linha por (mensagem, pessoa mencionada), única na dupla, removida com a pessoa e quando a mensagem é apagada ou a menção sai na edição. É a fonte do contador de menções e da notificação da F1-06 | planejada |
-| Chat | Estado de leitura, por pessoa e conversa: posição de leitura (a última mensagem lida), contador de não lidas e contador de menções, nunca negativos. Regras em "Concorrência e idempotência" | planejada |
+| Chat | Estado de leitura, por pessoa e conversa: posição de leitura (a última mensagem lida), contador de não lidas e contador de menções, nunca negativos. Regras em "Concorrência e idempotência" | existe |
 | Chat | Notificações | a detalhar |
 | Chat | Tarefas | a detalhar |
 | Chat | Pedidos aos agentes e ações de bot | a detalhar |
@@ -337,7 +337,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 - Eventos do WebSocket: schemas Zod e tipos em `packages/chat-events/`, consumidos por `chat-api` e
   `web`. O WebSocket é Socket.IO só com o transporte WebSocket; o handshake usa o cookie `sid` e
   confere a origem contra `WEB_ORIGIN`. A recusa usa `sessao_invalida` ou `origem_invalida`.
-- Eventos da F1-04 (situação `planejada`), todos publicados depois do commit (ADR 0025), um por
+- Eventos da F1-04, todos publicados depois do commit (ADR 0025), um por
   pessoa: `mensagem_criada`, para cada participante, o autor inclusive, com a conversa, a
   mensagem e as contagens da pessoa naquela conversa; `contagem_atualizada`, só para quem leu,
   com as contagens novas; `digitando`, com a conversa e quem digita, para os outros
@@ -379,10 +379,10 @@ de eventos do WebSocket estão a definir. O que já está decidido:
 | Evento `conversa_visivel` (WebSocket) | existe | Publicado quando a pessoa passa a ver uma conversa: canal público novo (todos os membros), canal privado novo (o criador), conversa direta nova (os dois) e convite (só quem foi convidado de fato). Leva só o id da conversa; o `web` relê a lateral |
 | `GET /v1/pessoas` (API do chat) | existe | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
 | `GET /v1/pessoas/:id` (API do chat) | existe | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
-| `GET /v1/conversas/:id/mensagens` (API do chat) | planejada | Ganha `antes` e `tem_mais` (convenção de paginação, acima) |
-| `POST /v1/conversas/:id/leitura` (API do chat) | planejada | Registra a leitura até uma mensagem da conversa, com sessão e pelo serviço de participação; devolve as contagens da conversa. Regras em "Concorrência e idempotência". Erros: `conversa_inexistente` (404), `dados_invalidos` (400, para mensagem de outra conversa) |
-| `GET /v1/conversas` (API do chat) | planejada | Passa a trazer `nao_lidas` e `mencoes` em cada conversa |
-| `GET /api/conversas/:id/mensagens` (BFF) | planejada | Repassa a página do histórico para o SWR do navegador |
+| `GET /v1/conversas/:id/mensagens` (API do chat) | existe | Ganha `antes` e `tem_mais` (convenção de paginação, acima) |
+| `POST /v1/conversas/:id/leitura` (API do chat) | existe | Registra a leitura até uma mensagem da conversa, com sessão e pelo serviço de participação; devolve as contagens da conversa. Regras em "Concorrência e idempotência". Erros: `conversa_inexistente` (404), `dados_invalidos` (400, para mensagem de outra conversa) |
+| `GET /v1/conversas` (API do chat) | existe | Passa a trazer `nao_lidas` e `mencoes` em cada conversa |
+| `GET /api/conversas/:id/mensagens` (BFF) | existe | Repassa a página do histórico ao navegador, que a pede ao rolar até o começo ou por botão |
 | `PATCH /v1/conversas/:id/mensagens/:mensagemId` (API do chat) | planejada | Edita o texto (aparado, de 1 a `tamanho da mensagem`), só o autor e dentro do `prazo para editar e apagar`. Regras em "Concorrência e idempotência". Erros: `mensagem_inexistente` (404), `mensagem_de_outra_pessoa` (403), `prazo_encerrado` (422, com `details.prazo_segundos`), `mensagem_apagada` (422), `dados_invalidos` (400), `conversa_inexistente` (404) |
 | `DELETE /v1/conversas/:id/mensagens/:mensagemId` (API do chat) | planejada | Apaga a mensagem, só o autor e no mesmo prazo; repetir é sucesso sem efeito. Mesmos erros, menos `mensagem_apagada` e `dados_invalidos` |
 | `GET /v1/conversas/:id/mencionaveis` (API do chat) | planejada | Os participantes da conversa, menos quem pede, para a lista de `@`: id, nome e @usuário, ordenados por nome, até `resultados da busca de pessoas`, com a busca (`busca`) da F1-03. Pelo serviço de participação: conversa alheia é `conversa_inexistente` |
@@ -456,7 +456,7 @@ definir.
 | `/` (casca: Rail, lateral com as conversas e menu do usuário) | Sessão | O membro da sessão e a lista de conversas | Abrir conversa; criar canal; abrir conversa direta; trocar a própria senha, num diálogo; sair | existe |
 | `/conversas/[id]` | Sessão | A conversa e as `mensagens devolvidas por leitura` mais recentes | Enviar mensagem; ver os participantes e convidar, no canal privado | existe |
 | A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
-| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções somadas pela F1-05) | — | planejada |
+| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções somadas pela F1-05) | — | existe |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
 | `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | existe |
 | Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | existe |
@@ -464,10 +464,10 @@ definir.
 
 **Leituras e tempo real.** A página carrega pelos Server Components. No cliente, o SWR guarda as
 leituras que o tempo real altera (mensagens, não lidas, notificações), e cada evento do WebSocket
-atualiza esse cache direto, sem nova requisição. Na F1-02, o painel da conversa aberta guarda as mensagens
-em estado do próprio componente, sem SWR: junta a leitura do servidor, a mensagem que a pessoa enviou e o evento
-`mensagem_criada` sem repetir (pelo identificador), e o `conversa_visivel` faz o `web` reler a lateral. O SWR
-entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
+atualiza esse cache direto, sem nova requisição. A lista de conversas da lateral, com as contagens, fica no SWR.
+O painel da conversa aberta guarda as mensagens em estado do próprio componente: junta a leitura do servidor, as
+páginas anteriores do histórico, a mensagem que a pessoa enviou e o evento `mensagem_criada` sem repetir (pelo
+identificador), e o `conversa_visivel` faz o `web` reler a lateral.
 
 - **Mensagens.** `mensagem_criada` acrescenta ao fim da conversa carregada, ignorando um id já
   presente (a resposta do envio e a reposição podem trazer a mesma), e grava as contagens na lista.
@@ -514,7 +514,7 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
   confirmado, manda-o a cada reconexão e entrega os eventos por tipo a quem se inscreveu; ignora o
   que já viu. No `perdido`, recarrega a página atual pelo histórico, sem erro técnico na tela. A
   fábrica do socket é injetável, para o teste usar um socket falso. Expõe também o estado da
-  conexão, que a casca mostra como "conectado" ou "reconectando" (F1-04, `planejada`), sem
+  conexão, que a casca mostra como "conectado" ou "reconectando", sem
   "reconectando" na primeira conexão da página, anunciado por região `aria-live` educada.
 
 **Notificação do navegador.**
@@ -544,12 +544,11 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
 | Retenção dos eventos de reconexão | 15 minutos (PRD da FD-03) | API do chat (Redis) | Constante `RECONNECT_RETENTION_MS`, em `apps/chat-api/src/config/values.ts` |
 | Intervalo de conferência das sessões das conexões | 2 segundos; sustenta o fechamento em até 5 s (PRD da FD-03) | API do chat | Constante `SESSION_CHECK_INTERVAL_MS`, no mesmo arquivo |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
-| Tamanho da página do histórico | 50 mensagens, em ordem cronológica; vale também para a leitura sem âncora (as mais recentes) | API do chat | A definir |
-| Limite de membros para o "digitando" | 15; acima disso o aviso não é repassado nem mostrado (PRD da F1-04) | API do chat | A definir |
-| Tempo para o "digitando" sumir | 5 segundos sem novo evento (spec da F1-04) | `web` | A definir |
-| Intervalo de envio do "digitando" | No máximo um a cada 3 segundos por conversa, no campo de mensagem (spec da F1-04) | `web` | A definir |
-| Intervalo mínimo entre "digitando" | 1 segundo por pessoa e conversa; o repetido antes disso é ignorado (spec da F1-04) | API do chat | A definir |
-| Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | Constante `MESSAGES_PER_READ`, no mesmo arquivo |
+| Tamanho da página do histórico | 50 mensagens, em ordem cronológica; vale também para a leitura sem âncora (as mais recentes) | API do chat | Constante `MESSAGES_PER_PAGE`, em `apps/chat-api/src/config/values.ts` |
+| Limite de membros para o "digitando" | 15; acima disso o aviso não é repassado nem mostrado (PRD da F1-04) | API do chat | Constante `TYPING_MEMBER_LIMIT`, no mesmo arquivo |
+| Tempo para o "digitando" sumir | 5 segundos sem novo evento (spec da F1-04) | `web` | Constante `TYPING_EXPIRE_MS`, em `apps/web/src/lib/typing.ts` |
+| Intervalo de envio do "digitando" | No máximo um a cada 3 segundos por conversa, no campo de mensagem (spec da F1-04) | `web` | Constante `TYPING_SEND_INTERVAL_MS`, no mesmo arquivo do `web` |
+| Intervalo mínimo entre "digitando" | 1 segundo por pessoa e conversa; o repetido antes disso é ignorado (spec da F1-04) | API do chat | Constante `TYPING_MIN_INTERVAL_MS`, em `apps/chat-api/src/config/values.ts` |
 | Tamanho do nome do canal | 1 a 80 caracteres | API do chat e `web` | Constante `CHANNEL_NAME_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` (projetos independentes, [ADR 0017](adr/0017-projetos-pnpm-independentes.md)) |
 | Tamanho da mensagem | Até 4.000 caracteres | API do chat e `web` | Constante `MESSAGE_TEXT_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` |
 | Convidados por pedido | Até 100 | API do chat | Constante `INVITE_MAX`, no mesmo arquivo |
@@ -626,8 +625,6 @@ As decisões que mudam o desenho estão no HLD, seção 10.
       do schema das variáveis.
 - [ ] Parser da conferência de somente leitura (pglast ou sqlglot).
 - [ ] Biblioteca de log estruturado (pino e structlog, ou o logger de cada framework).
-- [ ] Se o SWR entra na F1-04 ou se o estado do próprio componente basta para as leituras que o tempo
-      real altera; a F1-02 não o usa ("Cliente", "Leituras e tempo real").
 - [ ] Porquê das escolhas sem motivo registrado: App Router, SWR, FastAPI próprio, uv; ADRs 0017,
       0018, 0019, 0021 e 0022.
 

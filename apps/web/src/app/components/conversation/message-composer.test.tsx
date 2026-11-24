@@ -10,7 +10,7 @@ const action = vi.mocked(sendMessageAction);
 const sent: ChatMessage = {
   id: "m1",
   conversa_id: "c1",
-  autor: { id: "p1", nome: "Ana" },
+  autor: { id: "p1", nome: "Ana", usuario: "ana" },
   texto: "oi",
   criada_em: "2026-11-24T10:00:00.000Z",
 };

@@ -4,7 +4,7 @@ import { dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
 const message = (id: string, criadaEm: string, texto = id): ChatMessage => ({
   id,
   conversa_id: "c1",
-  autor: { id: "p1", nome: "Ana" },
+  autor: { id: "p1", nome: "Ana", usuario: "ana" },
   texto,
   criada_em: criadaEm,
 });

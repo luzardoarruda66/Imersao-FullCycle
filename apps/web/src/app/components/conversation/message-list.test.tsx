@@ -5,7 +5,7 @@ import { MessageList } from "./message-list";
 const at = (id: string, date: Date, autor = "Ana", texto = id): ChatMessage => ({
   id,
   conversa_id: "c1",
-  autor: { id: "p1", nome: autor },
+  autor: { id: "p1", nome: autor, usuario: "ana" },
   texto,
   criada_em: date.toISOString(),
 });

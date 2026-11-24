@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type ChatEvent, SERVER_MESSAGES } from 'chat-events';
+import { type ChatEvent, SERVER_MESSAGES, isLiveOnly } from 'chat-events';
 import type { Server, Socket } from 'socket.io';
 
 /** Uma conexão aberta de uma aba. Com `buffer`, a reposição está em curso: os eventos ao vivo esperam nele. */
@@ -44,7 +44,10 @@ export class ConnectionRegistry {
 
   /** Entrega à sala da pessoa, menos às abas em reposição, que guardam o evento no `buffer` até terminar. */
   deliver(personId: string, event: ChatEvent) {
-    for (const connection of this.byPerson.get(personId) ?? []) connection.buffer?.push(event);
+    // O evento só ao vivo não espera a reposição: repô-lo depois seria mentira, e o identificador dele não é ponto de reposição.
+    if (!isLiveOnly(event.tipo)) {
+      for (const connection of this.byPerson.get(personId) ?? []) connection.buffer?.push(event);
+    }
     this.server?.to(personRoom(personId)).except(replayRoom(personId)).emit(SERVER_MESSAGES.event, event);
   }
 }

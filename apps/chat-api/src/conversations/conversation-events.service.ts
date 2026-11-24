@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { ChatEventDraft, ChatMessage } from 'chat-events';
+import type { ChatEventDraft, ChatMessage, ReadCounts } from 'chat-events';
 import { Repository } from 'typeorm';
-import { ConversationParticipantEntity } from '../database/entities/conversation-participant.entity.js';
 import type { ConversationEntity } from '../database/entities/conversation.entity.js';
 import { PersonEntity } from '../database/entities/person.entity.js';
 import { EventPublisher } from '../realtime/event-publisher.service.js';
@@ -20,23 +19,34 @@ export class ConversationEvents {
   constructor(
     private readonly publisher: EventPublisher,
     @InjectRepository(PersonEntity) private readonly people: Repository<PersonEntity>,
-    @InjectRepository(ConversationParticipantEntity)
-    private readonly participants: Repository<ConversationParticipantEntity>,
   ) {}
 
-  /** Quem vê a conversa: todos os membros no canal público, os participantes no resto. */
-  async recipientsOf(conversation: Pick<ConversationEntity, 'id' | 'type'>): Promise<string[]> {
-    if (conversation.type === 'canal_publico') {
-      const rows = await this.people.find({ select: { id: true } });
-      return rows.map((row) => row.id);
-    }
-    const rows = await this.participants.find({ where: { conversationId: conversation.id } });
-    return rows.map((row) => row.personId);
+  /**
+   * `mensagem_criada` para cada participante, com as contagens dele; o autor também recebe, para as outras abas
+   * (as contagens dele não mudam). `countsOf` devolve as contagens de cada pessoa depois da soma desta mensagem.
+   */
+  async messageCreated(
+    conversation: Pick<ConversationEntity, 'id'>,
+    message: ChatMessage,
+    recipients: string[],
+    countsOf: (personId: string) => ReadCounts,
+  ) {
+    await Promise.all(
+      recipients.map((personId) =>
+        this.publishAll([personId], {
+          tipo: 'mensagem_criada',
+          dados: { conversa_id: conversation.id, mensagem: message, contagens: countsOf(personId) },
+        }),
+      ),
+    );
   }
 
-  async messageCreated(conversation: Pick<ConversationEntity, 'id' | 'type'>, message: ChatMessage) {
-    const recipients = await this.safely(() => this.recipientsOf(conversation));
-    await this.publishAll(recipients, { tipo: 'mensagem_criada', dados: { conversa_id: conversation.id, mensagem: message } });
+  /** A pessoa leu a conversa: as contagens novas vão para todas as abas dela. */
+  readCountsChanged(personId: string, conversationId: string, counts: ReadCounts) {
+    return this.publishAll([personId], {
+      tipo: 'contagem_atualizada',
+      dados: { conversa_id: conversationId, ...counts },
+    });
   }
 
   /** A conversa entrou na lista de cada pessoa dada. */

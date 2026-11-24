@@ -1,8 +1,9 @@
 import "server-only";
-import type { ChatMessage } from "chat-events";
+import type { ReadCounts } from "chat-events";
 import { cache } from "react";
 import type { ApiResult } from "@/lib/chat-api-response";
 import type { ConversationDetail, ConversationList, MemberOption } from "@/lib/conversations";
+import type { MessagePage } from "@/lib/reading";
 import { callChatApi } from "./chat-api";
 
 /**
@@ -25,8 +26,16 @@ export async function getConversation(id: string): Promise<ApiResult<Conversatio
   return callChatApi<ConversationDetail>(`/v1/conversas/${encodeURIComponent(id)}`);
 }
 
-/** As 50 mensagens mais recentes, da mais antiga para a mais nova. */
-export async function getMessages(id: string): Promise<ApiResult<ChatMessage[]>> {
-  const result = await callChatApi<{ mensagens: ChatMessage[] }>(`/v1/conversas/${encodeURIComponent(id)}/mensagens`);
-  return result.kind === "ok" ? { ...result, data: result.data.mensagens } : result;
+/** Uma página de 50 mensagens, da mais antiga para a mais nova: as mais recentes, ou as anteriores à âncora `before`. */
+export async function getMessages(id: string, before?: string): Promise<ApiResult<MessagePage>> {
+  const query = before ? `?antes=${encodeURIComponent(before)}` : "";
+  return callChatApi<MessagePage>(`/v1/conversas/${encodeURIComponent(id)}/mensagens${query}`);
+}
+
+/** Registra a leitura da conversa até a mensagem e devolve as contagens novas. */
+export async function markConversationRead(id: string, messageId: string): Promise<ApiResult<ReadCounts>> {
+  return callChatApi<ReadCounts>(`/v1/conversas/${encodeURIComponent(id)}/leitura`, {
+    method: "POST",
+    body: { mensagem_id: messageId },
+  });
 }

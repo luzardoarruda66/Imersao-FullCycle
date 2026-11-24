@@ -12,6 +12,10 @@ class FakeSocket {
   disconnect() {
     this.disconnected = true;
   }
+  emitted: { event: string; payload: unknown }[] = [];
+  emit(event: string, payload: unknown) {
+    this.emitted.push({ event, payload });
+  }
   /** O servidor ou a rede disparam o evento no cliente. */
   fire(event: string, ...args: unknown[]) {
     (this.handlers.get(event) as ((...args: unknown[]) => void) | undefined)?.(...args);
@@ -148,5 +152,103 @@ describe("RealtimeClient", () => {
     tabB.sockets[0]!.fire("evento", diag("e-5-0"));
     expect(tabA.sockets[0]!.handshake()).toEqual({ ultimo_evento: "e-20-0" });
     expect(tabB.sockets[0]!.handshake()).toEqual({ ultimo_evento: "e-5-0" });
+  });
+
+  describe("estado da conexão", () => {
+    it("começa conectando, sem alarde, e passa a conectado na primeira conexão", () => {
+      const { client, sockets } = setup();
+      expect(client.getState()).toBe("connecting");
+      client.start();
+      expect(client.getState()).toBe("connecting");
+      sockets[0]!.fire("connect");
+      expect(client.getState()).toBe("connected");
+    });
+
+    it("a queda depois de conectado vira reconectando e a volta, conectado", () => {
+      const { client, sockets } = setup();
+      client.start();
+      sockets[0]!.fire("connect");
+      sockets[0]!.fire("disconnect", "transport close");
+      expect(client.getState()).toBe("reconnecting");
+      sockets[0]!.fire("connect");
+      expect(client.getState()).toBe("connected");
+    });
+
+    it("o erro de conexão antes da primeira conexão não vira reconectando", () => {
+      const { client, sockets } = setup();
+      client.start();
+      sockets[0]!.fire("connect_error", new Error("xhr poll error"));
+      expect(client.getState()).toBe("connecting");
+    });
+
+    it("o erro de conexão depois de ter conectado mantém reconectando", () => {
+      const { client, sockets } = setup();
+      client.start();
+      sockets[0]!.fire("connect");
+      sockets[0]!.fire("disconnect", "ping timeout");
+      sockets[0]!.fire("connect_error", new Error("xhr poll error"));
+      expect(client.getState()).toBe("reconnecting");
+    });
+
+    it("avisa quem assinou a cada mudança e para depois de cancelar", () => {
+      const { client, sockets } = setup();
+      const listener = vi.fn();
+      const cancel = client.subscribeState(listener);
+      client.start();
+      sockets[0]!.fire("connect");
+      expect(listener).toHaveBeenCalledTimes(1);
+      cancel();
+      sockets[0]!.fire("disconnect", "transport close");
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("o stop volta ao estado inicial", () => {
+      const { client, sockets } = setup();
+      client.start();
+      sockets[0]!.fire("connect");
+      client.stop();
+      expect(client.getState()).toBe("connecting");
+    });
+  });
+
+  describe("eventos só ao vivo", () => {
+    const typing = (id: string) =>
+      ({ id, tipo: "digitando", dados: { conversa_id: "c1", pessoa: { id: "p1", usuario: "ana" } }, momento: "agora" }) as ChatEvent;
+
+    it("entrega o digitando sem mexer no último evento confirmado", () => {
+      const { client, sockets } = setup();
+      const listener = vi.fn();
+      client.subscribe("digitando", listener);
+      client.start();
+      sockets[0]!.fire("evento", diag("e-10-0"));
+      sockets[0]!.fire("evento", typing("ao_vivo-99-0"));
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(sockets[0]!.handshake()).toEqual({ ultimo_evento: "e-10-0" });
+    });
+
+    it("não descarta um digitando repetido como evento antigo", () => {
+      const { client, sockets } = setup();
+      const listener = vi.fn();
+      client.subscribe("digitando", listener);
+      client.start();
+      sockets[0]!.fire("evento", diag("e-10-0"));
+      sockets[0]!.fire("evento", typing("ao_vivo-1-0"));
+      sockets[0]!.fire("evento", typing("ao_vivo-1-0"));
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("mensagens do cliente", () => {
+    it("manda o digitando pelo socket aberto", () => {
+      const { client, sockets } = setup();
+      client.start();
+      client.sendTyping("c1");
+      expect(sockets[0]!.emitted).toEqual([{ event: "digitando", payload: { conversa_id: "c1" } }]);
+    });
+
+    it("não manda nada sem conexão aberta", () => {
+      const { client } = setup();
+      expect(() => client.sendTyping("c1")).not.toThrow();
+    });
   });
 });

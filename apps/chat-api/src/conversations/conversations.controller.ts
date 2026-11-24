@@ -1,15 +1,19 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Member } from '../auth/member.js';
 import {
   createChannelSchema,
   inviteSchema,
+  listMessagesSchema,
   openDirectSchema,
+  readSchema,
   sendMessageSchema,
   type CreateChannelDto,
   type InviteDto,
+  type ListMessagesDto,
   type OpenDirectDto,
+  type ReadDto,
   type SendMessageDto,
 } from './conversations.schemas.js';
 import { ConversationsService } from './conversations.service.js';
@@ -55,10 +59,21 @@ export class ConversationsController {
     return this.conversations.invite(id, personId, body.membros_ids);
   }
 
-  @ApiOperation({ summary: 'As 50 mensagens mais recentes, da mais antiga para a mais nova' })
+  @ApiOperation({ summary: 'Uma página de 50 mensagens, da mais antiga para a mais nova; `antes` pagina para trás' })
   @Get(':id/mensagens')
-  listMessages(@Param('id') id: string, @CurrentUser('id') personId: string) {
-    return this.messages.recent(id, personId);
+  listMessages(
+    @Param('id') id: string,
+    @Query({ schema: listMessagesSchema }) query: ListMessagesDto,
+    @CurrentUser('id') personId: string,
+  ) {
+    return this.messages.page(id, personId, query.antes);
+  }
+
+  @ApiOperation({ summary: 'Registrar a leitura da conversa até uma mensagem; devolve as contagens' })
+  @Post(':id/leitura')
+  @HttpCode(200)
+  markRead(@Param('id') id: string, @Body({ schema: readSchema }) body: ReadDto, @CurrentUser('id') personId: string) {
+    return this.messages.markRead(id, personId, body.mensagem_id);
   }
 
   @ApiOperation({ summary: 'Enviar uma mensagem' })
@@ -68,6 +83,6 @@ export class ConversationsController {
     @Body({ schema: sendMessageSchema }) body: SendMessageDto,
     @CurrentUser() member: Member,
   ) {
-    return this.messages.send(id, { id: member.id, nome: member.nome }, body.texto);
+    return this.messages.send(id, member.id, body.texto);
   }
 }

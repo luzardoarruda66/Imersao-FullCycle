@@ -19,6 +19,9 @@ export interface ConversationSummary {
   nome: string;
 }
 
+/** Um item da lista da lateral: a conversa com as contagens da pessoa (LLD, "Interfaces"). */
+export type ConversationListItem = ConversationSummary & { nao_lidas: number; mencoes: number };
+
 export interface Participant {
   id: string;
   nome: string;
@@ -27,9 +30,9 @@ export interface Participant {
 export type ConversationDetail = ConversationSummary & { participantes?: Participant[] };
 
 export interface ConversationList {
-  canais_publicos: ConversationSummary[];
-  canais_privados: ConversationSummary[];
-  diretas: ConversationSummary[];
+  canais_publicos: ConversationListItem[];
+  canais_privados: ConversationListItem[];
+  diretas: ConversationListItem[];
 }
 
 @Injectable()
@@ -59,7 +62,7 @@ export class ConversationsService {
         .orderBy('lower(c.name)', 'ASC')
         .addOrderBy('c.id', 'ASC')
         .getMany();
-    const [publics, privates, directs] = await Promise.all([
+    const [publics, privates, directs, countRows] = await Promise.all([
       channels('canal_publico'),
       channels('canal_privado'),
       this.dataSource.query<{ id: string; name: string }[]>(
@@ -72,12 +75,23 @@ export class ConversationsService {
           ORDER BY lower(p.name), c.id`,
         [personId],
       ),
+      this.dataSource.query<{ conversation_id: string; unread_count: number; mention_count: number }[]>(
+        `SELECT conversation_id, unread_count, mention_count FROM conversation_read_states WHERE person_id = $1`,
+        [personId],
+      ),
     ]);
-    const channel = (c: ConversationEntity): ConversationSummary => ({ id: c.id, tipo: c.type, nome: c.name ?? '' });
+    const counts = new Map(countRows.map((row) => [row.conversation_id, row]));
+    const withCounts = (summary: ConversationSummary): ConversationListItem => ({
+      ...summary,
+      nao_lidas: counts.get(summary.id)?.unread_count ?? 0,
+      mencoes: counts.get(summary.id)?.mention_count ?? 0,
+    });
+    const channel = (c: ConversationEntity): ConversationListItem =>
+      withCounts({ id: c.id, tipo: c.type, nome: c.name ?? '' });
     return {
       canais_publicos: publics.map(channel),
       canais_privados: privates.map(channel),
-      diretas: directs.map((row) => ({ id: row.id, tipo: 'direta', nome: row.name })),
+      diretas: directs.map((row) => withCounts({ id: row.id, tipo: 'direta', nome: row.name })),
     };
   }
 

@@ -1,6 +1,7 @@
 import type { Repository } from 'typeorm';
 import type { ConversationParticipantEntity } from '../database/entities/conversation-participant.entity.js';
 import type { ConversationEntity, ConversationType } from '../database/entities/conversation.entity.js';
+import type { PersonEntity } from '../database/entities/person.entity.js';
 import { AppError } from '../errors/app-error.js';
 import { ConversationAccessService } from './conversation-access.service.js';
 
@@ -9,12 +10,17 @@ const PERSON = '0192f4a0-0000-7000-8000-000000000002';
 
 function build(type: ConversationType | null, participates: boolean) {
   const conversations = { findOneBy: vi.fn().mockResolvedValue(type ? { id: ID, type } : null) };
-  const participants = { existsBy: vi.fn().mockResolvedValue(participates) };
+  const participants = {
+    existsBy: vi.fn().mockResolvedValue(participates),
+    find: vi.fn().mockResolvedValue([{ personId: 'p1' }, { personId: 'p2' }]),
+  };
+  const people = { find: vi.fn().mockResolvedValue([{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }]) };
   const service = new ConversationAccessService(
     conversations as unknown as Repository<ConversationEntity>,
     participants as unknown as Repository<ConversationParticipantEntity>,
+    people as unknown as Repository<PersonEntity>,
   );
-  return { service, conversations, participants };
+  return { service, conversations, participants, people };
 }
 
 const codeOf = (promise: Promise<unknown>) =>
@@ -43,6 +49,18 @@ describe('ConversationAccessService', () => {
   it('conversa que não existe responde conversa_inexistente', async () => {
     const { service } = build(null, false);
     expect(await codeOf(service.requireAccess(ID, PERSON))).toBe('conversa_inexistente:404');
+  });
+
+  it('quem participa: todos os membros no canal público', async () => {
+    const { service, participants } = build('canal_publico', false);
+    expect(await service.participantIds({ id: ID, type: 'canal_publico' })).toEqual(['p1', 'p2', 'p3']);
+    expect(participants.find).not.toHaveBeenCalled();
+  });
+
+  it.each(['canal_privado', 'direta'] as const)('quem participa: os participantes gravados em %s', async (type) => {
+    const { service, people } = build(type, true);
+    expect(await service.participantIds({ id: ID, type })).toEqual(['p1', 'p2']);
+    expect(people.find).not.toHaveBeenCalled();
   });
 
   it('id que não é UUID responde igual, sem ir ao banco', async () => {

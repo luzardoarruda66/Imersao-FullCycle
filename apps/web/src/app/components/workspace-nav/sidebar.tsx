@@ -4,27 +4,43 @@ import { Hash, Lock, Plus, SquarePen } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import useSWR from "swr";
 import { CreateChannelDialog } from "@/app/components/conversation/create-channel-dialog";
 import { PeopleSearchDialog } from "@/app/components/conversation/people-search-dialog";
+import { ConnectionIndicator } from "@/app/components/realtime/connection-indicator";
 import { Avatar } from "@/app/components/ui/avatar";
 import { Button } from "@/app/components/ui/button";
+import { CountBadge } from "@/app/components/ui/count-badge";
 import { cn } from "@/app/utils/cn";
-import { conversationPath, type ConversationList, type ConversationSummary } from "@/lib/conversations";
+import { conversationPath, type ConversationList, type ConversationListItem } from "@/lib/conversations";
+import { isReadingConversation } from "@/lib/open-conversation";
 import { getRealtimeClient } from "@/lib/realtime/realtime";
+import { badgeSuffix, setCounts } from "@/lib/unread";
 
 const ROW = "flex h-7 w-full items-center gap-2 rounded-item px-2 text-body transition-colors duration-100";
 
-function ConversationLink({ conversation }: { conversation: ConversationSummary }) {
+function ConversationLink({ conversation }: { conversation: ConversationListItem }) {
   const active = usePathname() === conversationPath(conversation.id);
   const Icon = conversation.tipo === "canal_privado" ? Lock : Hash;
+  const unread = conversation.nao_lidas > 0 || conversation.mencoes > 0;
   return (
     <Link
       href={conversationPath(conversation.id)}
       aria-current={active ? "page" : undefined}
-      className={cn(ROW, active ? "bg-sidebar-active text-sidebar-on-active" : "text-sidebar-fg hover:bg-sidebar-hover")}
+      className={cn(
+        ROW,
+        active ? "bg-sidebar-active text-sidebar-on-active" : "text-sidebar-fg hover:bg-sidebar-hover",
+        unread && !active && "font-black text-sidebar-fg-strong",
+      )}
     >
       {conversation.tipo === "direta" ? <Avatar name={conversation.nome} size="xs" /> : <Icon size={16} aria-hidden />}
-      <span className="truncate">{conversation.nome}</span>
+      {/* Os selos são só visuais; o texto `sr-only` diz as contagens por extenso e faz parte do nome acessível (não é `aria-label`, que contrariaria o texto visível: WCAG 2.5.3). */}
+      <span className="min-w-0 flex-1 truncate">
+        {conversation.nome}
+        <span className="sr-only">{badgeSuffix(conversation.nao_lidas, conversation.mencoes)}</span>
+      </span>
+      <CountBadge count={conversation.mencoes} tone="mention" />
+      <CountBadge count={conversation.nao_lidas} />
     </Link>
   );
 }
@@ -59,8 +75,40 @@ function RefreshOnNewConversation() {
   return null;
 }
 
+const LIST_KEY = "conversas";
+
+/**
+ * A lista no cache do SWR (LLD, "Cliente", "Leituras e tempo real"): nasce da leitura do servidor, e cada evento a
+ * atualiza direto, sem nova requisição. Uma lista nova do servidor (a página foi relida) substitui a do cache.
+ */
+function useConversationList(initial: ConversationList | null) {
+  const { data, mutate } = useSWR<ConversationList | null>(LIST_KEY, null, { fallbackData: initial });
+  useEffect(() => {
+    void mutate(initial, { revalidate: false });
+  }, [initial, mutate]);
+  useEffect(() => {
+    const client = getRealtimeClient();
+    const offCreated = client.subscribe("mensagem_criada", (event) => {
+      const { conversa_id, contagens } = event.dados;
+      // A conversa que a aba está lendo não mostra selo novo enquanto a leitura viaja ao servidor.
+      const counts = isReadingConversation(conversa_id) ? { nao_lidas: 0, mencoes: 0 } : contagens;
+      void mutate((current) => (current ? setCounts(current, conversa_id, counts) : current), { revalidate: false });
+    });
+    const offRead = client.subscribe("contagem_atualizada", (event) => {
+      const { conversa_id, nao_lidas, mencoes } = event.dados;
+      void mutate((current) => (current ? setCounts(current, conversa_id, { nao_lidas, mencoes }) : current), { revalidate: false });
+    });
+    return () => {
+      offCreated();
+      offRead();
+    };
+  }, [mutate]);
+  return data ?? null;
+}
+
 /** Lateral da casca (component `Sidebar`): canais públicos e privados, conversas diretas e as ações de criar e de buscar pessoas. */
-export function Sidebar({ list }: { list: ConversationList | null }) {
+export function Sidebar({ list: serverList }: { list: ConversationList | null }) {
+  const list = useConversationList(serverList);
   const pathname = usePathname();
   const router = useRouter();
   const [retrying, startRetry] = useTransition();
@@ -123,6 +171,7 @@ export function Sidebar({ list }: { list: ConversationList | null }) {
           </>
         )}
       </nav>
+      <ConnectionIndicator />
       <CreateChannelDialog open={createOpen} onOpenChange={setCreateOpen} />
       <PeopleSearchDialog open={directOpen} onOpenChange={setDirectOpen} />
     </aside>

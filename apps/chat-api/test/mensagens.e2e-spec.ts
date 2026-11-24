@@ -44,7 +44,7 @@ describe('Mensagens (e2e HTTP)', () => {
     expect(res.body).toEqual({
       id: expect.any(String),
       conversa_id: canal,
-      autor: { id: ana.id, nome: 'Ana' },
+      autor: { id: ana.id, nome: 'Ana', usuario: 'ana' },
       texto: 'Bom dia, time',
       criada_em: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
     });

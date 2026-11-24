@@ -1,6 +1,10 @@
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { AuthBase1790000000000 } from '../../migrations/1790000000000-AuthBase.js';
+import { Conversations1790000000001 } from '../../migrations/1790000000001-Conversations.js';
+import { ConversationParticipantEntity } from './entities/conversation-participant.entity.js';
+import { ConversationEntity } from './entities/conversation.entity.js';
 import { LoginAttemptEntity } from './entities/login-attempt.entity.js';
+import { MessageEntity } from './entities/message.entity.js';
 import { PersonEntity } from './entities/person.entity.js';
 import { SessionEntity } from './entities/session.entity.js';
 
@@ -9,8 +13,15 @@ export function buildDataSourceOptions(url: string | undefined): DataSourceOptio
   return {
     type: 'postgres',
     url,
-    entities: [PersonEntity, SessionEntity, LoginAttemptEntity],
-    migrations: [AuthBase1790000000000],
+    entities: [
+      PersonEntity,
+      SessionEntity,
+      LoginAttemptEntity,
+      ConversationEntity,
+      ConversationParticipantEntity,
+      MessageEntity,
+    ],
+    migrations: [AuthBase1790000000000, Conversations1790000000001],
     synchronize: false,
     // Ids em UUID v7 gerados na aplicação; datas em UTC.
     extra: { options: '-c timezone=UTC' },

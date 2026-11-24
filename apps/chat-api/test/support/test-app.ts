@@ -43,7 +43,7 @@ export async function createTestApp(): Promise<TestApp> {
   configureApp(app);
   await app.init();
   const dataSource = app.get(DataSource);
-  await dataSource.query('TRUNCATE people, sessions, login_attempts');
+  await dataSource.query('TRUNCATE people, sessions, login_attempts, conversations, conversation_participants, messages CASCADE');
   return {
     app,
     clock,

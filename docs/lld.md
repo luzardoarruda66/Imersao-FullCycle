@@ -29,8 +29,8 @@ sem atualizar o snapshot.
 Um repositório com três aplicações implantadas separadamente (HLD, seção 5) e um pacote de tipos
 compartilhado. `web`, `chat-api` e `chat-events` são projetos pnpm independentes, cada um com o
 seu lockfile, sem workspace ([ADR 0017](adr/0017-projetos-pnpm-independentes.md)); `chat-events`
-entra em `web` e em `chat-api` como dependência `file:../../packages/chat-events`, e uma mudança
-nele exige reinstalar nos dois projetos. O projeto `agents` é gerenciado pelo uv.
+entra em `web` e em `chat-api` como dependência `file:../../packages/chat-events`, e um serviço do
+Compose o recompila a cada mudança (seção 10, "Ambiente de desenvolvimento"). O projeto `agents` é gerenciado pelo uv.
 
 ```
 apps/
@@ -526,10 +526,12 @@ A lista, o tipo e o padrão de cada variável da API do chat e do `web` estão n
 O que substitui cada serviço de produção está no HLD, seção 9, "Implantação e ambientes". O
 `compose.yaml` da raiz sobe os serviços; os comandos estão no `AGENTS.md` de cada app.
 
-- **Serviços presentes:** `web`, `chat-api`, Postgres, o substituto do S3 (SeaweedFS) o `e2e` (atrás do `profile` `e2e`) e o Redis, que entra com a FD-03
+- **Serviços presentes:** `web`, `chat-api`, Postgres, o substituto do S3 (SeaweedFS) o `e2e` (atrás do `profile` `e2e`), o `chat-events` e o Redis, que entra com a FD-03
   para os eventos de reconexão: a `chat-api` exige `REDIS_URL` para subir e só sobe depois de o
   Redis estar saudável. O Serviço de agentes e o Worker entram com o projeto `agents`, que passa a
-  usar o mesmo Redis.
+  usar o mesmo Redis. O `chat-events` compila o pacote de eventos para `dist/` e o vigia com o `tsc --watch`;
+  `chat-api` e `web` só sobem depois de o primeiro `dist` existir, e leem o `dist` pelo hard link do `file:`,
+  que o `tsc` reescreve no lugar. Um arquivo novo no pacote não ganha o link e pede reinstalar nos dois projetos.
 - **Contêiner das apps:** a imagem não guarda dependências. O repositório inteiro é montado em
   `/workspace`, e o contêiner, ao subir, roda `pnpm install` e fica de pé sem iniciar a app; o
   servidor de desenvolvimento é iniciado à mão, dentro dele. O `node_modules` fica na pasta do

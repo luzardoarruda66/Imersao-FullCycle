@@ -24,7 +24,7 @@ describe("MessageList", () => {
 
     it("cada mensagem tem a barra de ações com Copiar texto", () => {
       render(<MessageList messages={one()} intro={null} />);
-      expect(screen.getByRole("toolbar", { name: "Ações da mensagem" })).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Ações da mensagem" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Copiar texto" })).toBeInTheDocument();
     });
 
@@ -49,7 +49,7 @@ describe("MessageList", () => {
     it("mensagem apagada mostra o aviso no lugar do texto e não tem menu", () => {
       render(<MessageList messages={one({ apagada: true, texto: "" })} intro={null} />);
       expect(screen.getByText("Mensagem apagada")).toBeInTheDocument();
-      expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Ações da mensagem" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Copiar texto" })).not.toBeInTheDocument();
     });
   });

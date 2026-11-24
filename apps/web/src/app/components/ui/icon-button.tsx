@@ -9,10 +9,7 @@ const iconButtonVariants = cva(
   "inline-flex shrink-0 items-center justify-center rounded-control transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
-      tone: {
-        default: "text-fg-muted hover:bg-surface-subtle hover:text-fg",
-        danger: "text-danger-fg hover:bg-surface-subtle",
-      },
+      tone: { default: "text-fg-muted hover:bg-surface-subtle hover:text-fg" },
       size: { sm: "size-7", md: "size-9" },
     },
     defaultVariants: { tone: "default", size: "sm" },

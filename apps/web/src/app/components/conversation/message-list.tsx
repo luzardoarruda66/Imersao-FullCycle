@@ -54,7 +54,7 @@ function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessa
           </p>
         )}
       </div>
-      <MessageActions items={actionsOf(message)} />
+      <MessageActions actions={actionsOf(message)} />
     </li>
   );
 }

@@ -208,9 +208,26 @@ novas tentativas e idempotência").
   não altera os contadores e não publica evento.
 - **Contadores na leitura.** Quando a posição avança, a mesma transação recalcula `nao_lidas`
   como o número de mensagens de outras pessoas depois da posição (zero quando ela é a última
-  mensagem) e `mencoes` como o número de menções à pessoa depois dela (sempre zero até a F1-05). O
+  mensagem) e `mencoes` como o número de menções à pessoa depois dela (as linhas da tabela de menções). O
   `UPDATE` trava a linha, então a mensagem que está sendo gravada espera e entra na conta.
   Uma leitura nunca deixa um contador negativo.
+- **Menção, edição e exclusão (F1-05).** Todas gravam na mesma transação da mensagem e usam a mesma
+  extração do texto: os `@usuário` válidos (`formato do @usuário`) que casam com os participantes da
+  conversa; o resto fica como texto, e o autor nunca conta para si.
+  - *Envio:* uma linha de menção por pessoa e mensagem, mesmo que citada duas vezes; soma 1 a
+    `mencoes` de cada mencionado, junto com o `nao_lidas` que a mensagem já soma.
+  - *Edição:* só pelo autor, até `prazo para editar e apagar` depois do `created_at`, contado pelo
+    relógio da API. Texto igual ao gravado não muda nada nem publica. Recalcula as menções: quem
+    entrou soma 1 e quem saiu desconta 1 em `mencoes`, **só para quem ainda não leu a mensagem** (a
+    mensagem é posterior à posição de leitura da pessoa), porque `mencoes` conta as menções depois
+    da leitura; quem já era mencionado não muda. A atualização é condicional em `deleted_at` vazio.
+  - *Exclusão:* só pelo autor e no mesmo prazo. Zera o texto, grava `deleted_at`, remove as menções
+    e desconta 1 de `nao_lidas` de quem ainda não leu a mensagem e de `mencoes` de cada mencionado
+    que também não leu, nunca abaixo de zero. Condicional em `deleted_at` vazio: apagar de novo
+    devolve sucesso sem alterar nem publicar, e duas exclusões simultâneas descontam uma vez.
+  - *Contra a leitura:* edição, exclusão e leitura travam a linha do contador, então a leitura
+    que roda depois não conta a mensagem apagada e a exclusão que roda depois desconta só de quem
+    não leu.
 
 ### Transações
 
@@ -283,8 +300,9 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
 | Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes (só no canal privado e na conversa direta: o canal público não os grava). Nome do canal único sem diferenciar maiúsculas, valendo entre público e privado; um par de membros só tem uma conversa direta, pela chave `menorId:maiorId` | existe |
 | Chat | Mensagens (texto, autor pessoa, conversa) | existe |
-| Chat | Mensagens: autor bot, citação e marca "dados de negócio" | a detalhar |
-| Chat | Menções | a detalhar |
+| Chat | Mensagens: autor bot e marca "dados de negócio" | a detalhar |
+| Chat | Mensagens: `edited_at` (vazio até a primeira edição), `quoted_message_id` (opcional, mensagem da mesma conversa) e `deleted_at` (o texto é zerado ao apagar) | planejada |
+| Chat | Menções: uma linha por (mensagem, pessoa mencionada), única na dupla, removida com a pessoa e quando a mensagem é apagada ou a menção sai na edição. É a fonte do contador de menções e da notificação da F1-06 | planejada |
 | Chat | Estado de leitura, por pessoa e conversa: posição de leitura (a última mensagem lida), contador de não lidas e contador de menções, nunca negativos. Regras em "Concorrência e idempotência" | planejada |
 | Chat | Notificações | a detalhar |
 | Chat | Tarefas | a detalhar |
@@ -331,6 +349,12 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
   `intervalo mínimo entre "digitando"`, não repassa em conversa com mais membros que o
   `limite de membros para o "digitando"` (no canal público, todos os membros do workspace) e
   nunca o repassa a quem digita.
+- Formato da mensagem (F1-05, situação `planejada`), igual no envio, no histórico e nos eventos, com
+  um schema só no pacote `chat-events`: `mencoes` (id e @usuário de cada pessoa mencionada, para o
+  cliente destacar só as reais), `citacao` (id, autor, trecho de até `tamanho do trecho da citação`
+  caracteres e `apagada`; o trecho é montado na leitura, a partir do texto atual da citada), `editada_em`
+  e `apagada`. Mensagem apagada traz texto vazio e nenhuma menção. O envio aceita `citacao_id`,
+  de mensagem da mesma conversa e não apagada; do contrário, `dados_invalidos` (400).
 
 **Índice das rotas**
 
@@ -359,6 +383,11 @@ de eventos do WebSocket estão a definir. O que já está decidido:
 | `POST /v1/conversas/:id/leitura` (API do chat) | planejada | Registra a leitura até uma mensagem da conversa, com sessão e pelo serviço de participação; devolve as contagens da conversa. Regras em "Concorrência e idempotência". Erros: `conversa_inexistente` (404), `dados_invalidos` (400, para mensagem de outra conversa) |
 | `GET /v1/conversas` (API do chat) | planejada | Passa a trazer `nao_lidas` e `mencoes` em cada conversa |
 | `GET /api/conversas/:id/mensagens` (BFF) | planejada | Repassa a página do histórico para o SWR do navegador |
+| `PATCH /v1/conversas/:id/mensagens/:mensagemId` (API do chat) | planejada | Edita o texto (aparado, de 1 a `tamanho da mensagem`), só o autor e dentro do `prazo para editar e apagar`. Regras em "Concorrência e idempotência". Erros: `mensagem_inexistente` (404), `mensagem_de_outra_pessoa` (403), `prazo_encerrado` (422, com `details.prazo_segundos`), `mensagem_apagada` (422), `dados_invalidos` (400), `conversa_inexistente` (404) |
+| `DELETE /v1/conversas/:id/mensagens/:mensagemId` (API do chat) | planejada | Apaga a mensagem, só o autor e no mesmo prazo; repetir é sucesso sem efeito. Mesmos erros, menos `mensagem_apagada` e `dados_invalidos` |
+| `GET /v1/conversas/:id/mencionaveis` (API do chat) | planejada | Os participantes da conversa, menos quem pede, para a lista de `@`: id, nome e @usuário, ordenados por nome, até `resultados da busca de pessoas`, com a busca (`busca`) da F1-03. Pelo serviço de participação: conversa alheia é `conversa_inexistente` |
+| `GET /api/conversas/:id/mencionaveis` (BFF) | planejada | Repassa a lista de `@` para o SWR do navegador |
+| Eventos `mensagem_editada` e `mensagem_apagada` (WebSocket) | planejada | Depois do commit, um por participante: a mensagem completa, ou o id da mensagem e a conversa. Entram nos eventos de reconexão do Redis; `contagem_atualizada` sai só para quem teve contador alterado |
 
 ## 6. Estados e regras
 
@@ -427,7 +456,7 @@ definir.
 | `/` (casca: Rail, lateral com as conversas e menu do usuário) | Sessão | O membro da sessão e a lista de conversas | Abrir conversa; criar canal; abrir conversa direta; trocar a própria senha, num diálogo; sair | existe |
 | `/conversas/[id]` | Sessão | A conversa e as `mensagens devolvidas por leitura` mais recentes | Enviar mensagem; ver os participantes e convidar, no canal privado | existe |
 | A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
-| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções zeradas até a F1-05) | — | planejada |
+| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções somadas pela F1-05) | — | planejada |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
 | `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | existe |
 | Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | existe |
@@ -452,6 +481,16 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
   do "digitando"` e só com texto. O aviso, "@usuário está digitando" ou "Há N pessoas digitando...",
   some em `tempo para o "digitando" sumir` sem novo evento ou quando chega a mensagem do autor, e
   nunca mostra a própria pessoa.
+- **Mensagem editada ou apagada.** `mensagem_editada` e `mensagem_apagada` substituem a mensagem no
+  cache pelo id, se a conversa está carregada, e não fazem nada se não está; repetidas, não mudam
+  nada. Quando uma mensagem é apagada, as citações a ela nas mensagens carregadas passam a
+  `apagada`. Não há ação otimista: a tela espera a resposta e o evento.
+- **Menção, citação e ações (F1-05).** `@` no começo do texto ou depois de espaço abre a lista de
+  participantes (padrão `combobox`, por teclado e mouse); a mensagem destaca só as menções que vêm em
+  `mencoes`. **Citar** mostra o trecho sobre o campo, com cancelar. O menu de ações (Citar, Copiar
+  texto e, para o autor dentro do prazo, Editar e Apagar) abre por mouse, foco e teclado; o prazo
+  só esconde a ação, e quem recusa é a API. Editar é no lugar (Enter confirma, Esc cancela), Apagar
+  pede confirmação, e Copiar texto avisa o sucesso ou a falha por região `aria-live` educada.
 
 **Sessão no cliente.**
 
@@ -516,6 +555,8 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
 | Convidados por pedido | Até 100 | API do chat | Constante `INVITE_MAX`, no mesmo arquivo |
 | Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | Constantes `USERNAME_MIN_LENGTH` e `USERNAME_MAX_LENGTH`, no mesmo arquivo; função `isValidUsername`, em `apps/chat-api/src/accounts/username-rule.ts` |
 | Resultados da busca de pessoas | No máximo 20 | API do chat | Constante `PEOPLE_SEARCH_LIMIT`, no mesmo arquivo |
+| Prazo para editar e apagar | 4 horas depois do envio (PRD da F1-05) | API do chat e `web` | A definir |
+| Tamanho do trecho da citação | 140 caracteres (spec da F1-05) | API do chat | A definir |
 
 **Variáveis de ambiente**
 
@@ -617,9 +658,10 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 **Estados, regras e processos**
 
 - [ ] Subseções de "Estados e regras": pedido ao agente (estados; resposta a uma pergunta como
-      pedido novo ou continuação), pergunta pendente (quando termina), mensagem (exclusão com
-      menções, notificações e contadores; edição que acrescenta menção), consulta
+      pedido novo ou continuação), pergunta pendente (quando termina), consulta
       a dados de negócio (comparação do lastro), limite de pedidos e teto de custo, presença.
+- [ ] Remoção da notificação quando a menção sai (mensagem apagada ou menção tirada na edição): a
+      tabela de notificações é da F1-06, e a F1-05 só remove a menção.
 - [ ] Tarefa: concluir uma já concluída, ou reabrir uma aberta.
 - [ ] Idempotência da tarefa do PDF (chave no S3, entrega única) e outras rotinas (retenção dos
       PDFs, perguntas pendentes vencidas).

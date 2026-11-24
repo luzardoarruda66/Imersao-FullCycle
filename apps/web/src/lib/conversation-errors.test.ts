@@ -8,6 +8,13 @@ describe("conversationErrorMessage", () => {
     expect(conversationErrorMessage("conversa_inexistente")).toBe("Esta conversa não existe ou você não participa dela.");
   });
 
+  it("traduz os códigos de edição da mensagem", () => {
+    expect(conversationErrorMessage("prazo_encerrado")).toBe("O prazo de 4 horas para editar esta mensagem acabou.");
+    expect(conversationErrorMessage("mensagem_apagada")).toBe("Esta mensagem foi apagada.");
+    expect(conversationErrorMessage("mensagem_de_outra_pessoa")).toBe("Só quem escreveu a mensagem pode editá-la.");
+    expect(conversationErrorMessage("mensagem_inexistente")).toBe("Esta mensagem não existe mais.");
+  });
+
   it("usa a mensagem geral do contexto quando o código não é conhecido", () => {
     expect(conversationErrorMessage("erro_estranho", "Não foi possível criar o canal. Tente de novo.")).toBe(
       "Não foi possível criar o canal. Tente de novo.",

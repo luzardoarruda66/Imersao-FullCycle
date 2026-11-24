@@ -26,6 +26,7 @@ export const changePasswordSchema = z
 /** Limites das conversas (LLD, seção 9, "Valores e configuração"). */
 export const CHANNEL_NAME_MAX = 80;
 export const MESSAGE_TEXT_MAX = 4000;
+export const MESSAGE_OVER_LIMIT = "A mensagem passa de 4.000 caracteres. Divida o texto em mais de uma mensagem.";
 
 export const createChannelSchema = z.object({
   nome: z
@@ -42,9 +43,14 @@ export const sendMessageSchema = z.object({
     .string()
     .trim()
     .min(1, "Escreva uma mensagem.")
-    .max(MESSAGE_TEXT_MAX, "A mensagem passa de 4.000 caracteres. Divida o texto em mais de uma mensagem."),
+    .max(MESSAGE_TEXT_MAX, MESSAGE_OVER_LIMIT),
   /** A mensagem que esta cita; ausente ou vazia é uma mensagem sem citação. */
   citacaoId: z.preprocess((value) => (value === "" ? undefined : value), z.uuid().optional()),
+});
+
+/** O texto novo de uma mensagem editada: as mesmas regras do envio. */
+export const editMessageSchema = z.object({
+  texto: z.string().trim().min(1, "Escreva uma mensagem.").max(MESSAGE_TEXT_MAX, MESSAGE_OVER_LIMIT),
 });
 
 export const inviteSchema = z.object({

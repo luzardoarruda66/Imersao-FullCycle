@@ -1,9 +1,10 @@
 "use client";
 
 import type { ChatMessage } from "chat-events";
-import { ArrowDown, Copy, CornerUpLeft } from "lucide-react";
+import { ArrowDown, Copy, CornerUpLeft, Pencil } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { MessageEditor } from "@/app/components/conversation/message-editor";
 import { MessageActions, type MessageAction } from "@/app/components/conversation/message-actions";
 import { MessageText } from "@/app/components/conversation/message-text";
 import { Avatar } from "@/app/components/ui/avatar";
@@ -11,8 +12,9 @@ import { Button } from "@/app/components/ui/button";
 import { Spinner } from "@/app/components/ui/spinner";
 import { cn } from "@/app/utils/cn";
 import { useMounted } from "@/app/utils/use-mounted";
+import { useNow } from "@/app/utils/use-now";
 import { copyText } from "@/lib/clipboard";
-import { formatTime, groupByDay } from "@/lib/messages";
+import { canEdit, formatTime, groupByDay } from "@/lib/messages";
 
 /** A folga, em pixels, em que a rolagem ainda conta como "no fim". */
 const BOTTOM_SLACK = 24;
@@ -20,8 +22,13 @@ const BOTTOM_SLACK = 24;
 const TOP_TRIGGER = 48;
 
 /** As ações da mensagem, na ordem da barra e do menu. A mensagem apagada não tem nenhuma. */
-function actionsOf(message: ChatMessage, onQuote?: (message: ChatMessage) => void): MessageAction[] {
+function actionsOf(
+  message: ChatMessage,
+  handlers: { onQuote?: (message: ChatMessage) => void; onEdit?: (message: ChatMessage) => void },
+  canEditNow: boolean,
+): MessageAction[] {
   if (message.apagada) return [];
+  const { onQuote, onEdit } = handlers;
   return [
     ...(onQuote ? [{ id: "quote", label: "Citar", icon: CornerUpLeft, onSelect: () => onQuote(message) }] : []),
     {
@@ -33,7 +40,17 @@ function actionsOf(message: ChatMessage, onQuote?: (message: ChatMessage) => voi
         else toast.error("Não foi possível copiar o texto");
       },
     },
+    ...(onEdit && canEditNow ? [{ id: "edit", label: "Editar", icon: Pencil, onSelect: () => onEdit(message) }] : []),
   ];
+}
+
+/** A edição em andamento: qual mensagem, se está salvando, o erro da última tentativa e o que fazer ao salvar ou cancelar. */
+export interface EditingState {
+  messageId: string;
+  pending: boolean;
+  error?: string;
+  onSave: (text: string) => void;
+  onCancel: () => void;
 }
 
 /** A mensagem que esta cita: autor e trecho, e leva até a original. Se a original foi apagada, só avisa. */
@@ -67,14 +84,22 @@ function MessageItem({
   mounted,
   currentMemberId,
   onQuote,
+  onEdit,
+  editing,
   onGoToMessage,
 }: {
   message: ChatMessage;
   mounted: boolean;
   currentMemberId?: string;
   onQuote?: (message: ChatMessage) => void;
+  onEdit?: (message: ChatMessage) => void;
+  editing?: EditingState;
   onGoToMessage?: (id: string) => void;
 }) {
+  const isEditing = editing?.messageId === message.id;
+  // O prazo depende da hora de agora: só depois da hidratação, para o HTML do servidor não divergir do navegador.
+  const now = useNow();
+  const canEditNow = now !== null && canEdit(message, currentMemberId, now);
   return (
     <li id={`mensagem-${message.id}`} tabIndex={-1} className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
       <Avatar name={message.autor.nome} />
@@ -89,13 +114,16 @@ function MessageItem({
         {message.citacao && <QuoteLink quote={message.citacao} onGoTo={onGoToMessage} />}
         {message.apagada ? (
           <p className="text-body text-fg-muted">Mensagem apagada</p>
+        ) : isEditing ? (
+          <MessageEditor initial={message.texto} error={editing.error} pending={editing.pending} onSave={editing.onSave} onCancel={editing.onCancel} />
         ) : (
           <p className="text-body break-words whitespace-pre-wrap text-fg">
             <MessageText text={message.texto} mentions={message.mencoes} currentMemberId={currentMemberId} />
+            {message.editada_em && <span className="text-caption text-fg-muted"> (editada)</span>}
           </p>
         )}
       </div>
-      <MessageActions actions={actionsOf(message, onQuote)} />
+      {!isEditing && <MessageActions actions={actionsOf(message, { onQuote, onEdit }, canEditNow)} />}
     </li>
   );
 }
@@ -156,6 +184,8 @@ export function MessageList({
   onAtBottomChange = () => {},
   currentMemberId,
   onQuote,
+  onEdit,
+  editing,
   onGoToMessage,
 }: {
   messages: ChatMessage[];
@@ -169,6 +199,10 @@ export function MessageList({
   currentMemberId?: string;
   /** Escolher "Citar" numa mensagem; sem isto, a ação não aparece. */
   onQuote?: (message: ChatMessage) => void;
+  /** Escolher "Editar" numa mensagem do próprio membro, dentro do prazo; sem isto, a ação não aparece. */
+  onEdit?: (message: ChatMessage) => void;
+  /** A edição em andamento, se houver: a mensagem mostra o editor no lugar do texto. */
+  editing?: EditingState;
   /** Clicar na citação: ir até a mensagem original. */
   onGoToMessage?: (id: string) => void;
 }) {
@@ -250,6 +284,8 @@ export function MessageList({
                         mounted={mounted}
                         currentMemberId={currentMemberId}
                         onQuote={onQuote}
+                        onEdit={onEdit}
+                        editing={editing}
                         onGoToMessage={onGoToMessage}
                       />
                     ))}

@@ -1,5 +1,5 @@
 import type { ChatMessage } from "chat-events";
-import { excerptOf, dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
+import { applyEdit, canEdit, EDIT_WINDOW_MS, excerptOf, dayLabel, formatTime, groupByDay, mergeMessages } from "./messages";
 
 const message = (id: string, criadaEm: string, texto = id): ChatMessage => ({
   id,
@@ -83,5 +83,73 @@ describe("excerptOf", () => {
 
   it("conta caracteres de verdade, sem partir um emoji", () => {
     expect(excerptOf("😀".repeat(150))).toBe(`${"😀".repeat(140)}…`);
+  });
+});
+
+describe("canEdit", () => {
+  const sent = Date.parse("2026-11-24T10:00:00.000Z");
+  const own = { autor: { id: "p1" }, criada_em: new Date(sent).toISOString(), apagada: false } as ChatMessage;
+
+  it("só o autor edita, até 4 horas depois do envio, inclusive", () => {
+    expect(canEdit(own, "p1", sent)).toBe(true);
+    expect(canEdit(own, "p1", sent + EDIT_WINDOW_MS)).toBe(true);
+    expect(canEdit(own, "p1", sent + EDIT_WINDOW_MS + 1)).toBe(false);
+    expect(canEdit(own, "p2", sent)).toBe(false);
+    expect(canEdit(own, undefined, sent)).toBe(false);
+  });
+
+  it("nunca edita mensagem apagada", () => {
+    expect(canEdit({ ...own, apagada: true }, "p1", sent)).toBe(false);
+  });
+
+  it("o prazo é de 4 horas", () => {
+    expect(EDIT_WINDOW_MS).toBe(4 * 60 * 60 * 1000);
+  });
+});
+
+describe("applyEdit", () => {
+  const base = (id: string, texto: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
+    id,
+    conversa_id: "c1",
+    autor: { id: "p1", nome: "Ana", usuario: "ana" },
+    texto,
+    criada_em: "2026-11-24T10:00:00.000Z",
+    mencoes: [],
+    citacao: null,
+    editada_em: null,
+    apagada: false,
+    ...over,
+  });
+  const quoteOf = (id: string, trecho: string, apagada = false) => ({ id, autor: { id: "p1", nome: "Ana", usuario: "ana" }, trecho, apagada });
+
+  it("troca a mensagem pelo id e deixa as outras como estão", () => {
+    const current = [base("m1", "antigo"), base("m2", "outra")];
+    const edited = base("m1", "novo", { editada_em: "2026-11-24T10:05:00.000Z" });
+    const next = applyEdit(current, edited);
+    expect(next).toEqual([edited, current[1]]);
+    expect(next[1]).toBe(current[1]);
+  });
+
+  it("não faz nada, e devolve a mesma lista, quando a mensagem não está carregada", () => {
+    const current = [base("m1", "antigo")];
+    expect(applyEdit(current, base("m9", "novo"))).toBe(current);
+  });
+
+  it("a mesma edição entregue duas vezes dá o mesmo resultado", () => {
+    const current = [base("m1", "antigo")];
+    const edited = base("m1", "novo", { editada_em: "2026-11-24T10:05:00.000Z" });
+    expect(applyEdit(applyEdit(current, edited), edited)).toEqual([edited]);
+  });
+
+  it("as citações carregadas à mensagem editada passam a mostrar o texto novo, cortado em 140", () => {
+    const current = [base("m1", "antigo"), base("m2", "resposta", { citacao: quoteOf("m1", "antigo") }), base("m3", "outra", { citacao: quoteOf("m0", "x") })];
+    const next = applyEdit(current, base("m1", "y".repeat(200)));
+    expect(next[1]!.citacao!.trecho).toBe(`${"y".repeat(140)}…`);
+    expect(next[2]).toBe(current[2]);
+  });
+
+  it("não reescreve a citação de uma mensagem apagada", () => {
+    const current = [base("m1", "antigo"), base("m2", "r", { citacao: quoteOf("m1", "", true) })];
+    expect(applyEdit(current, base("m1", "novo"))[1]!.citacao).toEqual(quoteOf("m1", "", true));
   });
 });

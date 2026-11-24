@@ -6,7 +6,7 @@ import { SESSION_COOKIE } from "@/lib/session-cookie";
 import { config } from "./config";
 
 interface CallOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 }
 

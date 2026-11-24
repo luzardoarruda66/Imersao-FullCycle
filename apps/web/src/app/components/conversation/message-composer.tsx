@@ -11,10 +11,9 @@ import { cn } from "@/app/utils/cn";
 import { excerptOf } from "@/lib/messages";
 import { activeMention, insertMention } from "@/lib/mentions";
 import type { PersonSummary } from "@/lib/people";
-import { MESSAGE_TEXT_MAX } from "@/lib/schemas";
+import { MESSAGE_OVER_LIMIT, MESSAGE_TEXT_MAX } from "@/lib/schemas";
 
 const IDLE: SendMessageState = { status: "idle" };
-const OVER_LIMIT = "A mensagem passa de 4.000 caracteres. Divida o texto em mais de uma mensagem.";
 
 /** Os participantes que a pessoa pode mencionar, pela rota do BFF; a leitura anterior é cancelada a cada digitação. */
 async function fetchMentionable(url: string, signal: AbortSignal): Promise<PersonSummary[]> {
@@ -114,7 +113,7 @@ export function MessageComposer({
   const overLimit = text.trim().length > MESSAGE_TEXT_MAX;
   const empty = text.trim().length === 0;
   const canSend = !empty && !overLimit && !pending;
-  const error = overLimit ? OVER_LIMIT : state.status === "error" ? state.message : undefined;
+  const error = overLimit ? MESSAGE_OVER_LIMIT : state.status === "error" ? state.message : undefined;
 
   return (
     <form ref={form} action={formAction} className="relative shrink-0 px-4 pb-4">

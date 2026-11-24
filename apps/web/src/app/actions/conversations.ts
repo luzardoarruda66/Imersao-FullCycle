@@ -7,6 +7,7 @@ import { conversationErrorMessage } from "@/lib/conversation-errors";
 import { conversationPath, type ConversationSummary, type Participant } from "@/lib/conversations";
 import {
   createChannelSchema,
+  editMessageSchema,
   fieldErrorsOf,
   inviteSchema,
   openDirectSchema,
@@ -26,6 +27,10 @@ export type OpenDirectState = { status: "idle" } | { status: "error"; message: s
 export type InviteState =
   | { status: "idle" }
   | { status: "success"; participantes: Participant[] }
+  | { status: "error"; message: string };
+
+export type EditMessageResult =
+  | { status: "edited"; message: ChatMessage }
   | { status: "error"; message: string };
 
 export type SendMessageState =
@@ -113,6 +118,24 @@ export async function markReadAction(conversationId: string, messageId: string):
   const result = await markConversationRead(parsed.data.conversationId, parsed.data.messageId);
   if (result.kind === "invalid-session") return endSession();
   return { ok: result.kind === "ok" };
+}
+
+/**
+ * Salva o texto novo da própria mensagem. A API confere o autor, o prazo de 4 horas e se a mensagem foi apagada; o
+ * erro volta como texto para o editor, que continua aberto com o que a pessoa escreveu.
+ */
+export async function editMessageAction(conversationId: string, messageId: string, texto: string): Promise<EditMessageResult> {
+  const parsed = editMessageSchema.safeParse({ texto });
+  if (!parsed.success) return { status: "error", message: fieldErrorsOf<"texto">(parsed.error).texto ?? "Escreva uma mensagem." };
+
+  const result = await callChatApi<ChatMessage>(
+    `/v1/conversas/${encodeURIComponent(conversationId)}/mensagens/${encodeURIComponent(messageId)}`,
+    { method: "PATCH", body: { texto: parsed.data.texto } },
+  );
+  if (result.kind === "ok") return { status: "edited", message: result.data };
+  if (result.kind === "invalid-session") return endSession();
+  const fallback = "Não foi possível salvar a edição. Verifique a conexão e tente de novo. O texto foi mantido.";
+  return { status: "error", message: result.kind === "error" ? conversationErrorMessage(result.code, fallback) : fallback };
 }
 
 export async function sendMessageAction(

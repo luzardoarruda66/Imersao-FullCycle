@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
+description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants unit or integration tests.
 ---
 
 # Test-Driven Development
@@ -24,6 +24,16 @@ A **seam** is the public boundary you test at: the interface where you observe b
 Ask: "What's the public interface, and which seams should we test?" Give each proposed seam a one-line note on what it catches and what it misses.
 
 When the shape of that interface is itself in question (how deep the module is, where the seam belongs, what the interface should expose), call the Skill tool with "codebase-design" for the vocabulary. It is the shared source of the module, interface, depth, seam, adapter, leverage and locality terms, and it is a reference to consult, not a session to run.
+
+## Unit tests
+
+Every **unit** with logic of its own gets unit tests, besides the tests at the higher seams. A unit is a module whose rules can be told apart from the seam above it: a pure function, a validator or schema, a parser, a state machine, a reducer, a component with states. Its exported interface is a seam: the tests call it directly, with no I/O, in the project's unit runner and next to the code, in the project's convention.
+
+Higher seams prove the capability end to end; unit tests prove each rule and edge of the unit (boundary values, every error branch), which a higher seam reaches only slowly and by accident. A ticket is done when each of its units has unit tests that went red first, besides the seam tests the spec's testing decisions name.
+
+Units of the kinds the spec's testing decisions name need no new confirmation. A unit of another kind joins the seam list and is confirmed like any other seam.
+
+See the unit example in [tests.md](tests.md).
 
 ## Anti-patterns
 

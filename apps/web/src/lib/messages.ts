@@ -20,10 +20,13 @@ export function canEdit(message: ChatMessage, memberId: string | undefined, now:
 
 /**
  * Aplica uma mensagem editada à lista: troca pelo id e atualiza o trecho das citações carregadas a ela. Mensagem que não
- * está carregada não muda a lista (devolve a mesma). Aplicar duas vezes a mesma edição dá o mesmo resultado.
+ * está carregada, ou que chega mais velha que a já mostrada (eventos fora de ordem) ou depois de apagada, não muda a
+ * lista (devolve a mesma). Aplicar duas vezes a mesma edição dá o mesmo resultado.
  */
 export function applyEdit(messages: ChatMessage[], edited: ChatMessage): ChatMessage[] {
-  if (!messages.some((message) => message.id === edited.id)) return messages;
+  const shown = messages.find((message) => message.id === edited.id);
+  if (!shown || shown.apagada) return messages;
+  if (shown.editada_em && edited.editada_em && Date.parse(edited.editada_em) < Date.parse(shown.editada_em)) return messages;
   return messages.map((message) => {
     if (message.id === edited.id) return edited;
     const quote = message.citacao;

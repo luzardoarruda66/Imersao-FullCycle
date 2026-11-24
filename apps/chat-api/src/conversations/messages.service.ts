@@ -8,7 +8,7 @@ import { EDIT_WINDOW_MS, MESSAGES_PER_PAGE, QUOTE_EXCERPT_MAX } from '../config/
 import { MentionEntity } from '../database/entities/mention.entity.js';
 import { MessageEntity } from '../database/entities/message.entity.js';
 import { AppError } from '../errors/app-error.js';
-import { ConversationAccessService } from './conversation-access.service.js';
+import { ConversationAccessService, UUID } from './conversation-access.service.js';
 import { ConversationEvents } from './conversation-events.service.js';
 import { MentionsService, type MentionRef } from './mentions.service.js';
 
@@ -18,7 +18,6 @@ export interface MessagePage {
   tem_mais: boolean;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const messageNotFound = () => new AppError('mensagem_inexistente', 404, 'Mensagem não encontrada.');
 
 const invalidField = (campo: string, mensagem: string) =>
@@ -134,7 +133,8 @@ export class MessagesService {
     if (!UUID.test(messageId)) throw messageNotFound();
     const everyone = await this.access.participantIds(conversation);
 
-    const changed = await this.dataSource.transaction(async (manager) => {
+    // `null` quando o texto é igual ao gravado (nada muda); senão, as contagens novas de quem teve o contador alterado.
+    const countsChanged = await this.dataSource.transaction(async (manager) => {
       const [row] = await manager.query<{ text: string; created_at: Date; author_id: string; deleted_at: Date | null }[]>(
         `SELECT text, created_at, author_id, deleted_at FROM messages WHERE id = $1 AND conversation_id = $2 FOR UPDATE`,
         [messageId, conversation.id],
@@ -156,31 +156,51 @@ export class MessagesService {
       if (added.length > 0) await manager.insert(MentionEntity, added.map((id) => ({ messageId, personId: id })));
       if (removed.length > 0) await manager.query(`DELETE FROM mentions WHERE message_id = $1 AND person_id = ANY($2::uuid[])`, [messageId, removed]);
 
-      // Ordem fixa (sempre os que entram e depois os que saem, cada grupo ordenado): sem impasse com outra transação.
-      const counts = new Map<string, ReadCounts>();
-      for (const [ids, delta] of [[added, 1], [removed, -1]] as const) {
-        if (ids.length === 0) continue;
-        const updated = await manager.query<CountRow[]>(
-          `UPDATE conversation_read_states rs
-              SET mention_count = GREATEST(rs.mention_count + $4, 0), updated_at = now()
+      return this.adjustMentionCounts(manager, conversation.id, messageId, added, removed);
+    });
+
+    const message = await this.messageById(conversation.id, messageId);
+    if (countsChanged === null) return message;
+    await this.events.messageEdited(conversation, message, everyone);
+    await Promise.all([...countsChanged].map(([id, counts]) => this.events.readCountsChanged(id, conversation.id, counts)));
+    return message;
+  }
+
+  /**
+   * Soma 1 a `mencoes` de quem passou a ser mencionado e desconta 1 de quem deixou de ser, só de quem ainda não leu a
+   * mensagem (a posição de leitura é anterior a ela), nunca abaixo de zero. As linhas são travadas em ordem de pessoa,
+   * como no envio, para duas transações nunca se esperarem em ciclo. Devolve as contagens de quem mudou.
+   */
+  private async adjustMentionCounts(
+    manager: EntityManager,
+    conversationId: string,
+    messageId: string,
+    added: string[],
+    removed: string[],
+  ): Promise<Map<string, ReadCounts>> {
+    const counts = new Map<string, ReadCounts>();
+    for (const [ids, delta] of [[added, 1], [removed, -1]] as const) {
+      if (ids.length === 0) continue;
+      const updated = await manager.query<CountRow[]>(
+        `WITH locked AS (
+           SELECT rs.person_id FROM conversation_read_states rs
             WHERE rs.conversation_id = $1 AND rs.person_id = ANY($2::uuid[])
               AND (rs.last_read_message_id IS NULL
                    OR (SELECT (c.created_at, c.id) FROM messages c WHERE c.id = rs.last_read_message_id)
                     < (SELECT (a.created_at, a.id) FROM messages a WHERE a.id = $3))
-          RETURNING person_id, unread_count, mention_count`,
-          [conversation.id, ids, messageId, delta],
-        );
-        // O driver devolve `[linhas, quantidade]` no UPDATE ... RETURNING.
-        for (const r of (Array.isArray(updated[0]) ? updated[0] : updated) as CountRow[]) counts.set(r.person_id, toCounts(r));
-      }
-      return counts;
-    });
-
-    const message = await this.messageById(conversation.id, messageId);
-    if (changed === null) return message;
-    await this.events.messageEdited(conversation, message, everyone);
-    await Promise.all([...changed].map(([id, counts]) => this.events.readCountsChanged(id, conversation.id, counts)));
-    return message;
+            ORDER BY rs.person_id
+              FOR UPDATE)
+         UPDATE conversation_read_states rs
+            SET mention_count = GREATEST(rs.mention_count + $4, 0), updated_at = now()
+           FROM locked
+          WHERE rs.conversation_id = $1 AND rs.person_id = locked.person_id
+      RETURNING rs.person_id, rs.unread_count, rs.mention_count`,
+        [conversationId, ids, messageId, delta],
+      );
+      // O driver devolve `[linhas, quantidade]` no UPDATE ... RETURNING.
+      for (const r of (Array.isArray(updated[0]) ? updated[0] : updated) as CountRow[]) counts.set(r.person_id, toCounts(r));
+    }
+    return counts;
   }
 
   /** Uma mensagem no formato da API, com as menções e a citação. */

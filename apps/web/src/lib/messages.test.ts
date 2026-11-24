@@ -148,6 +148,14 @@ describe("applyEdit", () => {
     expect(next[2]).toBe(current[2]);
   });
 
+  it("ignora uma edição mais velha que a já mostrada (eventos fora de ordem) e a de mensagem apagada", () => {
+    const newer = base("m1", "segunda edição", { editada_em: "2026-11-24T10:06:00.000Z" });
+    const current = [newer];
+    expect(applyEdit(current, base("m1", "primeira edição", { editada_em: "2026-11-24T10:05:00.000Z" }))).toBe(current);
+    const deleted = [base("m1", "", { apagada: true })];
+    expect(applyEdit(deleted, base("m1", "ressuscitada", { editada_em: "2026-11-24T10:07:00.000Z" }))).toBe(deleted);
+  });
+
   it("não reescreve a citação de uma mensagem apagada", () => {
     const current = [base("m1", "antigo"), base("m2", "r", { citacao: quoteOf("m1", "", true) })];
     expect(applyEdit(current, base("m1", "novo"))[1]!.citacao).toEqual(quoteOf("m1", "", true));

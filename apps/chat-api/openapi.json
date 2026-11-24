@@ -446,6 +446,32 @@
         ]
       }
     },
+    "/v1/pessoas": {
+      "get": {
+        "operationId": "DirectoryController_search",
+        "parameters": [
+          {
+            "name": "busca",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string"
+            },
+            "description": "Parte do nome ou do @usuário; vazia lista os primeiros membros"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Buscar pessoas por parte do nome ou do @usuário",
+        "tags": [
+          "pessoas"
+        ]
+      }
+    },
     "/v1/pessoas/{id}": {
       "get": {
         "operationId": "DirectoryController_profile",

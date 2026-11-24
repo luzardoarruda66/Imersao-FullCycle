@@ -28,7 +28,7 @@ Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da
 
 Tudo roda dentro dos contêineres do Docker Compose: instalação de dependências, servidor de desenvolvimento, testes, lint, compilação do TypeScript e qualquer outro comando do projeto. **Nunca rode `pnpm`, `node` ou `npx` direto na máquina.**
 
-O ambiente de desenvolvimento usa o `compose.yaml`, na raiz, com quatro serviços:
+O ambiente de desenvolvimento usa o `compose.yaml`, na raiz, com cinco serviços:
 
 | Serviço | O que é | Endereço na máquina | Endereço entre contêineres |
 | --- | --- | --- | --- |
@@ -36,6 +36,7 @@ O ambiente de desenvolvimento usa o `compose.yaml`, na raiz, com quatro serviço
 | `chat-api` | API em NestJS, REST e WebSocket | `http://localhost:3001` | `http://chat-api:3001` |
 | `postgres` | PostgreSQL, com os bancos `chat`, `agents` e `business` | `localhost:5432` | `postgres:5432` |
 | `s3` | Emulador do S3 (`seaweedfs`) | `http://localhost:8333` | `http://s3:8333` |
+| `redis` | Redis, com os eventos de reconexão do WebSocket (planejado pela FD-03) | `localhost:6379` | `redis:6379` |
 
 Os contêineres `web` e `chat-api` instalam as dependências ao subir e depois ficam parados, sem iniciar a aplicação. Os comandos rodam neles com `docker compose -f compose.yaml exec <serviço> <comando>` e os de cada projeto estão no `AGENTS.md` dele.
 

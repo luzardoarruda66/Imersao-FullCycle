@@ -1,6 +1,6 @@
 # LLD — Full Cycle Chat
 
-2026-11-18 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
+2026-11-24 · Luiz Carlos · Status: rascunho · HLD: [hld.md](hld.md)
 
 **Onde mora cada fato**
 
@@ -14,7 +14,7 @@
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
-| Eventos do WebSocket | Tipos TypeScript em `packages/chat-events/` (planejado) |
+| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `pronto` e `perdido` planejados pela FD-03; os outros, com as funcionalidades que os emitem) |
 | Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
@@ -42,8 +42,8 @@ apps/
                   dois processos do mesmo projeto
     scripts/      script de carga do Banco de negócio                 planejada
 packages/
-  chat-events/    tipos dos eventos do WebSocket, usados por          planejada
-                  chat-api e web
+  chat-events/    schemas e tipos dos eventos do WebSocket, usados    planejada
+                  por chat-api e web
 docs/             HLD, LLD, ADRs, brief
 ```
 
@@ -52,12 +52,13 @@ docs/             HLD, LLD, ADRs, brief
 | Frontend/BFF | Next.js com App Router | Next.js: HLD, seção 5 ([ADR 0002](adr/0002-next-bff-websocket-direto.md)); App Router: a definir |
 | Leituras no cliente que o tempo real altera | SWR | A definir |
 | Tempo real, no servidor e no cliente | Socket.IO | [ADR 0019](adr/0019-socket-io-tempo-real.md) |
+| Cliente do Redis na API do chat | `ioredis` | Tem os Streams, que guardam os eventos por pessoa, e reconecta sozinho |
 | API do chat | NestJS | HLD, seção 5 |
 | ORM e migrações do Banco do chat | TypeORM | [ADR 0018](adr/0018-typeorm-api-do-chat.md) |
 | Snapshot do contrato da API do chat | `@nestjs/swagger` | Gera o OpenAPI a partir do código |
 | Sessão, cookie e guard de autenticação da API do chat | `@nestjs/authentication` | Cobre o cookie de sessão, o guard global com `@Public()` e o handshake do WebSocket sobre a sessão no Banco do chat ([ADR 0016](adr/0016-sessao-na-api-do-chat.md)), sem escrever a autenticação à mão |
 | Hash de senha | scrypt, pelo `PasswordHasher` do `@nestjs/authentication` | [ADR 0023](adr/0023-scrypt-hash-de-senha.md) |
-| Teto de requisições por IP | `@nestjs/throttler`, em memória | Pacote oficial do Nest; não exige o Redis, ausente no ambiente local |
+| Teto de requisições por IP | `@nestjs/throttler`, em memória | Pacote oficial do Nest; o teto por IP não precisa do Redis |
 | Gerenciador dos projetos TypeScript | pnpm, um projeto por pasta, sem workspace | [ADR 0017](adr/0017-projetos-pnpm-independentes.md) |
 | Agentes | Python + Google ADK | [ADR 0003](adr/0003-agentes-python-google-adk.md) |
 | HTTP do Serviço de agentes | FastAPI próprio, com as rotas chamando o `Runner` do ADK | A definir |
@@ -99,12 +100,35 @@ Situação de todas: `planejada`.
 | Enfileirar | Identificador de pedido e consulta já conferida | Nada | Enfileirar duas vezes o mesmo identificador gera uma tarefa só |
 | Consumir | — | Uma tarefa ao Worker | Se o Worker falha, a tarefa volta à fila até `tentativas do Worker` |
 
-**Eventos por pessoa (Redis)** — usado pela API do chat para a reconexão (HLD 6.2).
+**Eventos por pessoa (Redis)** — usado pela API do chat para a reconexão (HLD 6.2). Situação: `planejada`.
 
 | Operação | Recebe | Devolve | Garante |
 | --- | --- | --- | --- |
 | Guardar evento | Pessoa e evento | Identificador crescente por pessoa | A ordem dos identificadores é a ordem dos eventos daquela pessoa |
-| Ler desde | Pessoa e último identificador confirmado | Os eventos seguintes, ou "perdido" | "Perdido" quando o identificador já saiu da `retenção dos eventos de reconexão`; o cliente então recarrega pelo histórico |
+| Ler desde | Pessoa e último identificador confirmado | Os eventos seguintes, ou "perdido" | "Perdido" quando o identificador já saiu da `retenção dos eventos de reconexão`, ou quando o armazenamento foi perdido; o cliente então recarrega pelo histórico |
+
+- **Identificador.** `época`, instante e sequência, com o instante tirado do `Clock` da API, para o
+  teste controlar a retenção. Os eventos de uma pessoa ficam num Redis Stream só dela.
+- **Retenção.** Cada gravação apara os eventos mais velhos que a `retenção dos eventos de
+  reconexão`, e a chave da pessoa expira depois do mesmo prazo sem gravação.
+- **Perdido** é a resposta quando o identificador traz outra época, quando o instante dele é mais
+  velho que a retenção em relação ao agora, e quando a leitura falha.
+- **Época.** Um valor aleatório guardado no próprio Redis e lido a cada conexão. Se o Redis perdeu
+  os dados, ele não existe mais e nasce outro, o que invalida todo identificador antigo. Quando
+  uma gravação no Redis falha, a época é trocada assim que o Redis voltar a responder: o evento
+  que não foi guardado nunca vira um buraco silencioso.
+- **Primeira conexão da aba** (sem último evento): não há reposição; o servidor devolve `pronto`
+  com o identificador atual da pessoa, ponto de partida da aba.
+- **Reposição.** A conexão entra na sala da pessoa e guarda, sem entregar, os eventos ao vivo que
+  chegam. Reenvia em ordem o que veio depois do último evento confirmado e então libera os guardados
+  com identificador maior que o último reenviado, e depois `pronto`. Nenhum evento sai duas vezes
+  nem fora de ordem.
+- **Publicação.** Serializada por pessoa: a ordem de saída é a ordem de gravação. Com o Redis fora,
+  o evento sai ao vivo sem ser guardado, e a época troca (acima). O handshake e a entrega ao vivo
+  não dependem do Redis estar de pé.
+- **Mensagens do servidor ao cliente.** `evento` (envelope: identificador, tipo, dados, momento),
+  `pronto` e `perdido`. O cliente informa o último evento confirmado no `auth` do handshake
+  (`ultimo_evento`).
 
 **Contadores (Redis)** — usados pelo Serviço de agentes (HLD 6.3).
 
@@ -145,8 +169,8 @@ novas tentativas e idempotência").
   obtém o IP atrás do proxy da PaaS está a definir, porque depende da PaaS escolhida (HLD,
   seção 12).
 - **Participação em canal privado e conversa direta:** um serviço só, no módulo de conversas, a
-  confere, e toda rota que lê ou escreve numa conversa o chama (o WebSocket o usa quando a FD-03
-  chegar). Quem não participa recebe a mesma resposta de uma conversa que não existe, para que a
+  confere, e toda rota que lê ou escreve numa conversa o chama. O WebSocket entrega por pessoa e
+  não o usa: quem publica o evento o chama para escolher os destinatários. Quem não participa recebe a mesma resposta de uma conversa que não existe, para que a
   resposta não revele que o canal privado existe. Canal público não exige convite.
 - **Credenciais de bot e de serviço:** a forma (um segredo por processo ou por agente) está a
   definir. Toda ação de bot leva o identificador de pedido
@@ -178,8 +202,10 @@ novas tentativas e idempotência").
 
 O que precisa ser atômico é do HLD (seção 7, "Regras que pesam no desenho"): a mensagem com as
 menções, as notificações e os contadores; a tarefa com a notificação dela. O evento só sai depois
-do commit. Onde a transação começa, como passa de um módulo a outro e como o evento é publicado
-depois do commit (publicação direta ou tabela de saída) estão a definir.
+do commit, por publicação direta, sem tabela de saída
+([ADR 0025](adr/0025-publicacao-direta-depois-do-commit.md)): o código que grava devolve o controle
+só depois da transação confirmada e então chama a publicação, que nunca roda dentro da transação.
+Onde a transação começa e como passa de um módulo a outro estão a definir.
 
 ### Erros
 
@@ -271,7 +297,9 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 - Campos do JSON em `snake_case`, nas três APIs.
 - Paginação: a definir.
 - Erros: "Conceitos transversais de implementação", seção "Erros".
-- Eventos do WebSocket: tipos em `packages/chat-events/`, consumidos por `chat-api` e `web`.
+- Eventos do WebSocket: schemas Zod e tipos em `packages/chat-events/`, consumidos por `chat-api` e
+  `web`. O WebSocket é Socket.IO só com o transporte WebSocket; o handshake usa o cookie `sid` e
+  confere a origem contra `WEB_ORIGIN`. A recusa usa `sessao_invalida` ou `origem_invalida`.
 
 **Índice das rotas**
 
@@ -315,6 +343,12 @@ Os números estão em "Valores e configuração".
 - **Validade.** A sessão vence depois da `duração da sessão` sem uso; cada requisição ou conexão
   autenticada renova o prazo. Não há teto absoluto: o `absoluteTtl` do pacote fica no máximo.
 - **Sair.** Apaga a sessão no Banco do chat (HLD 6.1). As outras sessões da pessoa continuam.
+- **Conexão em tempo real.** O handshake autentica pelo cookie e, como toda conexão autenticada,
+  renova o prazo. A cada `intervalo de conferência das sessões`, uma consulta só confere as
+  sessões de todas as conexões abertas e fecha as que não valem mais (sair, vencimento, encerrar
+  sessões, redefinir ou trocar a senha). A conferência não renova a sessão. A consulta periódica
+  existe porque o comando `contas` roda em outro processo e não alcança as conexões. As outras
+  conexões da mesma pessoa, de outras sessões, continuam abertas.
 - **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
   `regra da senha`, e a recusa lista as regras que faltaram. Depois da troca, a sessão atual
   continua e as outras sessões da pessoa são apagadas.
@@ -369,7 +403,15 @@ atualiza esse cache direto, sem nova requisição.
 - Com a API do chat fora do ar ou respondendo 5xx, a página logada mostra a porta "Erro de
   sessão", com "Tentar de novo", em vez de mandar para "Entrar": uma queda da API não tira
   ninguém da sessão.
-- Um 401 no WebSocket fecha a conexão e manda para "Entrar".
+- Um 401 no WebSocket fecha a conexão e manda para "Entrar". Na prática, o cliente deixa de
+  reconectar e recarrega a página atual: o servidor do `web` revalida a sessão, o BFF apaga o
+  cookie e o proxy leva a "Entrar", sem o laço descrito acima.
+- **Conexão em tempo real.** Um módulo do cliente, sem tela, na casca da área logada, abre uma
+  conexão por aba, com `withCredentials`, em `NEXT_PUBLIC_CHAT_WS_URL`. Guarda o último evento
+  confirmado, manda-o a cada reconexão e entrega os eventos por tipo a quem se inscreveu; ignora o
+  que já viu. No `perdido`, recarrega a página atual pelo histórico, sem erro técnico na tela. A
+  fábrica do socket é injetável, para o teste usar um socket falso. O indicador de conexão é da
+  F1-04.
 
 **Notificação do navegador.**
 
@@ -395,7 +437,8 @@ atualiza esse cache direto, sem nova requisição.
 | Teto de tentativas de entrar por IP | 30 em 15 minutos | API do chat | Constantes `LOGIN_IP_CEILING` e `LOGIN_IP_CEILING_WINDOW_MS`, no mesmo arquivo |
 | Regra da senha | Mínimo de 8 caracteres, com uma maiúscula, uma minúscula, um número e um símbolo (PRD da F1-01) | API do chat | Função `missingPasswordRules`, em `apps/chat-api/src/accounts/password-rule.ts` |
 | Validade do identificador de pedido | A definir | API do chat | A definir |
-| Retenção dos eventos de reconexão | A definir | API do chat (Redis) | A definir |
+| Retenção dos eventos de reconexão | 15 minutos (PRD da FD-03) | API do chat (Redis) | Constante `RECONNECT_RETENTION_MS`, em `apps/chat-api/src/config/values.ts` |
+| Intervalo de conferência das sessões das conexões | 2 segundos; sustenta o fechamento em até 5 s (PRD da FD-03) | API do chat | Constante `SESSION_CHECK_INTERVAL_MS`, no mesmo arquivo |
 | Tempo limite da consulta ao Banco de negócio | A definir | Serviço de agentes e Worker | A definir |
 | Tamanho da página do histórico | A definir (F1-04) | API do chat | A definir |
 | Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | A definir |
@@ -411,9 +454,10 @@ A lista, o tipo e o padrão de cada variável da API do chat e do `web` estão n
 O que substitui cada serviço de produção está no HLD, seção 9, "Implantação e ambientes". O
 `compose.yaml` da raiz sobe os serviços; os comandos estão no `AGENTS.md` de cada app.
 
-- **Serviços presentes:** `web`, `chat-api`, Postgres, o substituto do S3 (SeaweedFS) e o `e2e` (atrás do `profile` `e2e`). O Redis, o
-  Serviço de agentes e o Worker entram com o projeto `agents`; até lá, nenhum código do `web` ou
-  do `chat-api` pode exigir o Redis para subir localmente.
+- **Serviços presentes:** `web`, `chat-api`, Postgres, o substituto do S3 (SeaweedFS) o `e2e` (atrás do `profile` `e2e`) e o Redis, que entra com a FD-03
+  para os eventos de reconexão: a `chat-api` exige `REDIS_URL` para subir e só sobe depois de o
+  Redis estar saudável. O Serviço de agentes e o Worker entram com o projeto `agents`, que passa a
+  usar o mesmo Redis.
 - **Contêiner das apps:** a imagem não guarda dependências. O repositório inteiro é montado em
   `/workspace`, e o contêiner, ao subir, roda `pnpm install` e fica de pé sem iniciar a app; o
   servidor de desenvolvimento é iniciado à mão, dentro dele. O `node_modules` fica na pasta do
@@ -449,6 +493,7 @@ O que substitui cada serviço de produção está no HLD, seção 9, "Implantaç
 | [0022](adr/0022-uuid-v7.md) | UUID v7 como id, gerado na aplicação | aceita |
 | [0023](adr/0023-scrypt-hash-de-senha.md) | scrypt do `@nestjs/authentication` como hash de senha | aceita |
 | [0024](adr/0024-server-actions-nas-mutacoes.md) | Mutações do navegador ao BFF por Server Actions | aceita |
+| [0025](adr/0025-publicacao-direta-depois-do-commit.md) | Evento publicado direto depois do commit, sem tabela de saída | aceita |
 
 As decisões que mudam o desenho estão no HLD, seção 10.
 
@@ -481,7 +526,6 @@ As decisões que mudam o desenho estão no HLD, seção 10.
 - [ ] Como o BFF obtém o IP do navegador atrás do proxy (depende da PaaS, ainda aberta no HLD).
 - [ ] Função única que monta a mensagem para cada destinatário.
 - [ ] Onde a transação começa e como passa entre módulos.
-- [ ] Publicação do evento depois do commit: direta ou por tabela de saída.
 - [ ] Quem traduz exceção em resposta no Serviço de agentes.
 - [ ] Campos de correlação dos logs.
 - [ ] O que nunca vai para o log, além do que o HLD já diz.

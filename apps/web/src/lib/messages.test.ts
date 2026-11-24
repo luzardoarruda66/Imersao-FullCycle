@@ -7,6 +7,7 @@ const message = (id: string, criadaEm: string, texto = id): ChatMessage => ({
   autor: { id: "p1", nome: "Ana", usuario: "ana" },
   texto,
   criada_em: criadaEm,
+  mencoes: [], citacao: null, editada_em: null, apagada: false,
 });
 
 describe("mergeMessages", () => {

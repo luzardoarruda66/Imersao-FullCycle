@@ -19,6 +19,19 @@ export class MessageEntity {
   @Column({ type: 'text' })
   text: string;
 
+  /** Citação: outra mensagem da mesma conversa (F1-05). */
+  @ForeignKey(() => MessageEntity, { name: 'messages_quoted_message_fk', onDelete: 'SET NULL' })
+  @Column({ type: 'uuid', name: 'quoted_message_id', nullable: true })
+  quotedMessageId: string | null;
+
+  /** Vazio até a primeira edição. */
+  @Column({ type: 'timestamptz', name: 'edited_at', nullable: true })
+  editedAt: Date | null;
+
+  /** Ao apagar, o texto é zerado e a linha fica para mostrar "Mensagem apagada" (HLD, seção 7). */
+  @Column({ type: 'timestamptz', name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
+
   @Column({ type: 'timestamptz', name: 'created_at', default: () => 'now()' })
   createdAt: Date;
 

@@ -182,5 +182,10 @@ function toChatMessage(conversationId: string, row: MessageRow): ChatMessage {
     autor: { id: row.author_id, nome: row.author_name, usuario: row.author_username },
     texto: row.text,
     criada_em: row.created_at.toISOString(),
+    // Preenchidos pelas tarefas de menção, citação, edição e exclusão da F1-05.
+    mencoes: [],
+    citacao: null,
+    editada_em: null,
+    apagada: false,
   };
 }

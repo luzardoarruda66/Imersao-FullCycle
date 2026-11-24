@@ -47,6 +47,10 @@ describe('Mensagens (e2e HTTP)', () => {
       autor: { id: ana.id, nome: 'Ana', usuario: 'ana' },
       texto: 'Bom dia, time',
       criada_em: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+      mencoes: [],
+      citacao: null,
+      editada_em: null,
+      apagada: false,
     });
     const list = await read(bia, canal);
     expect(list.body.mensagens).toEqual([res.body]);

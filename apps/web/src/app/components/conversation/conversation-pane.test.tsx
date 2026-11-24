@@ -31,6 +31,7 @@ const message = (id: string, texto: string, conversa = "c1", criadaEm = "2026-11
   autor: { id: autorId, nome: "Ana", usuario: "ana" },
   texto,
   criada_em: criadaEm,
+  mencoes: [], citacao: null, editada_em: null, apagada: false,
 });
 
 const created = (m: ChatMessage) =>

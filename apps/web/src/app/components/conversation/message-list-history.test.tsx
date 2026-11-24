@@ -9,6 +9,7 @@ const msg = (id: string, minute: number): ChatMessage => ({
   autor: { id: "p1", nome: "Ana", usuario: "ana" },
   texto: id,
   criada_em: new Date(2026, 10, 24, 10, minute).toISOString(),
+  mencoes: [], citacao: null, editada_em: null, apagada: false,
 });
 
 /** O jsdom não tem layout: o teste dá as medidas da rolagem à região de mensagens. */

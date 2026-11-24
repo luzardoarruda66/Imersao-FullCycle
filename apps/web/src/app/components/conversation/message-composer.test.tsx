@@ -12,6 +12,7 @@ const sent: ChatMessage = {
   conversa_id: "c1",
   autor: { id: "p1", nome: "Ana", usuario: "ana" },
   texto: "oi",
+  mencoes: [], citacao: null, editada_em: null, apagada: false,
   criada_em: "2026-11-24T10:00:00.000Z",
 };
 

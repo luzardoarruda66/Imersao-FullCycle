@@ -123,7 +123,7 @@ Situação de todas: `planejada`.
   retenção também valha para a aba que não recebeu nada. Com o Redis fora, `pronto` leva `ultimo_evento` nulo, e
   o cliente guarda a marca `indisponivel`: na reconexão seguinte o servidor, que não a entende,
   responde `perdido`.
-- **Reposição.** A conexão entra no registro de conexões da pessoa (em memória, uma instância só da API; sem salas do Socket.IO, para poder guardar os eventos de uma conexão sem afetar as outras) e guarda, sem entregar, os eventos ao vivo que
+- **Reposição.** A conexão entra na sala da pessoa e, até a reposição acabar, também numa sala de reposição, que fica de fora da entrega ao vivo; um registro em memória guarda, por conexão e sem entregar, os eventos ao vivo que
   chegam. Reenvia em ordem o que veio depois do último evento confirmado e então libera os guardados
   com identificador maior que o último reenviado, e depois `pronto`. Nenhum evento sai duas vezes
   nem fora de ordem.

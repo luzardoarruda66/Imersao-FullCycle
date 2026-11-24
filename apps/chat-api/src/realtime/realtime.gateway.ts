@@ -9,7 +9,7 @@ import type { Member } from '../auth/member.js';
 import { Clock } from '../clock.js';
 import type { Env } from '../config/env.js';
 import { SESSION_CHECK_INTERVAL_MS, SESSION_IDLE_MS } from '../config/values.js';
-import { ConnectionRegistry, type Connection } from './connection-registry.js';
+import { ConnectionRegistry, type Connection, personRoom, replayRoom } from './connection-registry.js';
 import { PersonEventsStore } from './person-events.store.js';
 
 type RefusalCode = 'sessao_invalida' | 'origem_invalida';
@@ -38,6 +38,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
   ) {}
 
   afterInit(server: Server) {
+    this.connections.attach(server);
     server.use((socket, next) => {
       this.authenticate(socket).then(() => next(), (error: Error) => next(error));
     });
@@ -65,6 +66,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     const { personId, sessionId } = socket.data as { personId: string; sessionId: string };
     const connection: Connection = { socket, personId, sessionId, buffer: [] };
     this.connections.add(connection);
+    // Na sala da pessoa desde o início; a sala de reposição a deixa fora da entrega ao vivo até a reposição acabar.
+    await socket.join([personRoom(personId), replayRoom(personId)]);
     socket.on('disconnect', () => this.connections.remove(connection));
     try {
       await this.start(connection, handshakeAuthSchema.safeParse(socket.handshake.auth).data?.ultimo_evento);
@@ -94,6 +97,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     if (!socket.connected) return;
     if (result.status === 'lost') {
       connection.buffer = null;
+      void socket.leave(replayRoom(personId));
       socket.emit(SERVER_MESSAGES.lost, {});
       return;
     }
@@ -110,6 +114,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
   private release(connection: Connection, socket: Socket, reference: string | null) {
     const held = connection.buffer ?? [];
     connection.buffer = null;
+    // Sem espera entre esvaziar o buffer e sair da sala de reposição: nenhum evento cai no intervalo.
+    void socket.leave(replayRoom(connection.personId));
     for (const event of held) {
       if (reference === null || isNewerEventId(event.id, reference)) {
         socket.emit(SERVER_MESSAGES.event, event);

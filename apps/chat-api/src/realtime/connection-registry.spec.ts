@@ -8,33 +8,47 @@ const connection = (personId: string, buffer: ChatEvent[] | null = null) => {
   return { connection: { socket: { emit } as unknown as Socket, personId, sessionId: 's', buffer } satisfies Connection, emit };
 };
 
+/** Servidor falso: registra a sala, a sala excluída e o que foi emitido. */
+function fakeServer() {
+  const calls: { room: string; except?: string; message: string; payload: unknown }[] = [];
+  const server = {
+    to: (room: string) => ({
+      except: (except: string) => ({
+        emit: (message: string, payload: unknown) => void calls.push({ room, except, message, payload }),
+      }),
+    }),
+  };
+  return { server: server as never, calls };
+}
+
 describe('ConnectionRegistry.deliver', () => {
-  it('entrega a todas as conexões da pessoa e a mais ninguém', () => {
+  it('emite à sala da pessoa, sem a sala de reposição', () => {
     const registry = new ConnectionRegistry();
-    const [a1, a2, b] = [connection('ana'), connection('ana'), connection('bia')];
-    [a1, a2, b].forEach((c) => registry.add(c.connection));
+    const { server, calls } = fakeServer();
+    registry.attach(server);
     registry.deliver('ana', event('e-1-0'));
-    expect(a1.emit).toHaveBeenCalledWith('evento', event('e-1-0'));
-    expect(a2.emit).toHaveBeenCalledTimes(1);
-    expect(b.emit).not.toHaveBeenCalled();
+    expect(calls).toEqual([{ room: 'pessoa:ana', except: 'reposicao:ana', message: 'evento', payload: event('e-1-0') }]);
   });
 
-  it('guarda no buffer enquanto a reposição está em curso', () => {
+  it('guarda no buffer só das conexões da pessoa que estão em reposição', () => {
     const registry = new ConnectionRegistry();
-    const held = connection('ana', []);
-    registry.add(held.connection);
+    registry.attach(fakeServer().server);
+    const replaying = connection('ana', []);
+    const live = connection('ana');
+    const other = connection('bia', []);
+    [replaying, live, other].forEach((c) => registry.add(c.connection));
     registry.deliver('ana', event('e-1-0'));
-    expect(held.emit).not.toHaveBeenCalled();
-    expect(held.connection.buffer).toEqual([event('e-1-0')]);
+    expect(replaying.connection.buffer).toEqual([event('e-1-0')]);
+    expect(live.connection.buffer).toBeNull();
+    expect(other.connection.buffer).toEqual([]);
   });
 
-  it('para de entregar a conexão removida', () => {
+  it('lista as conexões abertas e esquece a removida', () => {
     const registry = new ConnectionRegistry();
     const c = connection('ana');
     registry.add(c.connection);
+    expect(registry.all()).toEqual([c.connection]);
     registry.remove(c.connection);
-    registry.deliver('ana', event('e-1-0'));
-    expect(c.emit).not.toHaveBeenCalled();
     expect(registry.all()).toEqual([]);
   });
 });

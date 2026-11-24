@@ -27,5 +27,9 @@ export type ListMessagesDto = z.infer<typeof listMessagesSchema>;
 export const readSchema = z.object({ mensagem_id: memberId });
 export type ReadDto = z.infer<typeof readSchema>;
 
-export const sendMessageSchema = z.object({ texto: z.string().trim().min(1).max(MESSAGE_TEXT_MAX) });
+/** `citacao_id`: a mensagem que esta cita; a conferência de que é da mesma conversa e não foi apagada é do serviço. */
+export const sendMessageSchema = z.object({
+  texto: z.string().trim().min(1).max(MESSAGE_TEXT_MAX),
+  citacao_id: memberId.optional(),
+});
 export type SendMessageDto = z.infer<typeof sendMessageSchema>;

@@ -456,7 +456,7 @@ Os estados `State=hover`, `active`, `focus` e `disabled` dos variants do Figma s
 
 ### Organização no Figma
 
-A página **Components** tem quatro seções:
+A página **Components** tem cinco seções:
 
 | Seção | Conteúdo |
 | --- | --- |
@@ -464,6 +464,7 @@ A página **Components** tem quatro seções:
 | Primitivos | Spinner, Avatar, Button, IconButton, CountBadge, PresenceDot, Kbd, Skeleton, Input, Textarea, Field, Switch, RadioOption, TabsTrigger, DropdownMenuItem, DropdownMenuSeparator, Tooltip, Toast, EmptyState, DialogHeader, ConfirmDialog |
 | Entities | UserAvatar, UserStatus, AgentAvatar, AgentTag, ChannelIcon, MentionChip, DayDivider, UnreadDivider, MessageSkeleton, NotificationItem, TaskItem, ReplyQuote, MessageActions, MessageEditor, AgentText, MessageItem, AgentRuns |
 | Features e widgets | SidebarRow, SidebarSection, SidebarAction, Sidebar, Rail, ThemeToggle, ConnectionBanner, ConversationHeader, ActivityHeader, ConversationIntro, MessageComposer, MentionOption, NewMessagesPill, JumpStatusPill, PersonRow, AgentRow, ContactRow, ProfilePanel, UserMenu, MessageMenu |
+| F1-04 Tempo real e não lidas | MentionBadge, TypingIndicator, ConnectionIndicator, HistoryTop (componentes novos da F1-04; o `CountBadge`, o `SidebarRow` e o `NewMessagesPill` que a F1-04 usa já estão nas seções acima) |
 
 A descrição de cada componente no Figma registra o comportamento que o código precisa reproduzir: atalhos de teclado, limites, o que some e quando. Leia a descrição antes de implementar.
 
@@ -546,6 +547,10 @@ Estes detalhes não aparecem só olhando o desenho:
 - **IconButton:** `label` é obrigatório e vira o tooltip e o `aria-label`. Ícone de 18 px; tons `default`, `sidebar` e `primary`; tamanhos 28 e 36.
 - **Tooltip:** atraso de 400 ms.
 - **CountBadge:** mostra `99+` acima de 99 e some em zero.
+- **MentionBadge:** a contagem de menções, `@N`, ao lado do `CountBadge` no item da lista; `99+` acima de 99 e some em zero (zerada até a F1-05). Fundo `mention-self-bg`.
+- **TypingIndicator:** "@usuário está digitando" (uma pessoa) ou "Há N pessoas digitando..." (mais de uma), em `small/regular` e `fg-muted`, acima do campo de mensagem. A região `aria-live` educada fica sempre no DOM, e só o texto muda.
+- **ConnectionIndicator:** "Conectado" ou "Reconectando", com o ponto em `success` ou `warning` e o texto sempre presente (nunca só cor), no rodapé da Sidebar. A região `aria-live` educada fica vazia até a primeira conexão da página.
+- **HistoryTop:** o topo da lista de mensagens. `more` é o botão "Carregar mensagens anteriores" (a rolagem até o começo também pede a página), `loading` é o Spinner com nome "Carregando mensagens anteriores", `failed` é a falha com "Tentar de novo" e `start` é "Início da conversa".
 - **PresenceDot:** cheia é disponível; anel vazado é ausente. No UserAvatar, a bolinha recorta o fundo (`Backdrop`: `sidebar`, `raised` ou `chrome`).
 - **Avatar:** iniciais em `font-black` sobre `avatar-1` a `avatar-6`. Tamanhos xs 20, sm 24, md 36, lg 48 e xl 96; xs e sm usam `text-micro`.
 - **AgentAvatar:** o robô (`Bot`) distingue agentes de pessoas.

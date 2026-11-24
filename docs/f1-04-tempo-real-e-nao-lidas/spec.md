@@ -159,20 +159,37 @@ As regras e os mecanismos, com o porquê, ficam no LLD, nas seções citadas; ab
 construir.
 
 **Arquivo de design.** O Figma do projeto é o `GXeHfkmxrSH9mGMHTweQSP` (`docs/design-system.md`).
-A F1-04 precisa de frames novos na página Telas, nos temas claro e escuro, como a F1-02 e a F1-03.
-Eles são o primeiro passo da implementação, e o PR que os desenha acrescenta os node-ids a esta
-tabela. A convenção é a da spec da F1-02: um frame claro e um escuro, com o sufixo `(escuro)`, e o
-tema vem do modo `Semantic` da variable.
+Os frames desta entrega estão na seção `F1-04 Tempo real e não lidas` (`2078:88509`) da página Telas,
+nos temas claro e escuro, e são o que o código implementa pelo fluxo "Do Figma para o código" do
+design system. Cada tela tem dois frames: o claro, sem sufixo, e o escuro, com o sufixo `(escuro)`. O
+tema vem do modo `Semantic` da variable, definido no próprio frame (`Light` ou `Dark`): a página Telas
+tem o modo `Dark` por padrão, então um frame sem o modo explícito aparece escuro.
 
-| Tela | Frame | Estados |
-| --- | --- | --- |
-| Conversa | `Tempo real / Conversa / ...` | Uma pessoa digitando; várias digitando; "Novas mensagens" sobre o fim; carregando página anterior; falha ao carregar a anterior; "Início da conversa" |
-| Lista de conversas | `Tempo real / Lista / ...` | Selo de não lidas e de menções (zerada, com valor e `99+`); conversa sem selo; conversa aberta |
-| Indicador de conexão | `Tempo real / Conexão / ...` | Conectado; reconectando |
+| Tela | Frame (claro) | Node-id claro | Node-id escuro |
+| --- | --- | --- | --- |
+| Conversa | `Tempo real / Conversa / Uma pessoa digitando` | `2078:88510` | `2078:88825` |
+| Conversa | `Tempo real / Conversa / Várias digitando` | `2078:89140` | `2078:89455` |
+| Conversa | `Tempo real / Conversa / Novas mensagens` | `2078:89770` | `2078:90088` |
+| Conversa | `Tempo real / Conversa / Carregando anterior` | `2078:90406` | `2078:90723` |
+| Conversa | `Tempo real / Conversa / Falha ao carregar anterior` | `2078:91040` | `2078:91358` |
+| Conversa | `Tempo real / Conversa / Início da conversa` | `2078:91676` | `2078:91991` |
+| Lista de conversas | `Tempo real / Lista / Com selos` | `2078:92306` | `2078:92788` |
+| Lista de conversas | `Tempo real / Lista / Sem selo` | `2078:93266` | `2078:93579` |
+| Lista de conversas | `Tempo real / Lista / Conversa aberta` | `2078:93892` | `2078:94225` |
+| Indicador de conexão | `Tempo real / Conexão / Conectado` | `2078:94558` | `2078:94874` |
+| Indicador de conexão | `Tempo real / Conexão / Reconectando` | `2078:95190` | `2078:95506` |
 
-Os frames partem dos de referência da Conversa e da Lista de conversas da F1-02. A F1-04 acrescenta
-o que a lista acima diz e nada mais: sem reações, sem presença, sem notificações e sem a divisória
-"novas mensagens" dentro da conversa.
+"Com selos" mostra o selo de não lidas com valor e `99+`, a conversa sem selo (zerada) e o selo de
+menções ao lado (`@2`); "Sem selo" é a lista toda em dia; "Conversa aberta" mostra a conversa aberta
+sem selo enquanto as outras o mostram. Os frames partem dos de referência da Conversa e da Lista de
+conversas da F1-02 (`Canais / Conversa / Canal público`), sem o botão "Atualizar a conversa". A F1-04
+acrescenta o que a tabela diz e nada mais: sem reações, sem presença, sem notificações e sem a
+divisória "novas mensagens" dentro da conversa.
+
+Componentes novos, criados na página Components, seção `F1-04 Tempo real e não lidas`: `TypingIndicator`,
+`MentionBadge`, `ConnectionIndicator` (`State=connected`, `reconnecting`) e `HistoryTop` (`State=more`,
+`loading`, `failed`, `start`). O `NewMessagesPill`, o `CountBadge` e o `SidebarRow` (`State=unread`,
+`Show badge`) já existiam e foram reaproveitados.
 
 **Modelo de dados (Banco do chat)**
 

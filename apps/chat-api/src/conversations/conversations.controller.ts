@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Member } from '../auth/member.js';
@@ -100,6 +100,13 @@ export class ConversationsController {
     @CurrentUser('id') personId: string,
   ) {
     return this.messages.edit(id, personId, messageId, body.texto);
+  }
+
+  @ApiOperation({ summary: 'Apagar a própria mensagem, até 4 horas depois do envio; apagar de novo não faz nada' })
+  @Delete(':id/mensagens/:mensagemId')
+  @HttpCode(200)
+  deleteMessage(@Param('id') id: string, @Param('mensagemId') messageId: string, @CurrentUser('id') personId: string) {
+    return this.messages.remove(id, personId, messageId);
   }
 
   @ApiOperation({ summary: 'Enviar uma mensagem' })

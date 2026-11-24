@@ -82,6 +82,13 @@ describe('chat-events', () => {
     expect(isLiveOnly('mensagem_editada')).toBe(false);
   });
 
+  it('valida o evento de mensagem apagada: só a conversa e o id, sem texto', () => {
+    const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
+    expect(chatEventSchema.parse({ ...base, tipo: 'mensagem_apagada', dados: { conversa_id: 'c1', mensagem_id: 'm1' } }).tipo).toBe('mensagem_apagada');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'mensagem_apagada', dados: { conversa_id: 'c1' } }).success).toBe(false);
+    expect(isLiveOnly('mensagem_apagada')).toBe(false);
+  });
+
   it('só o digitando é ao vivo; os outros eventos entram na reposição', () => {
     expect(isLiveOnly('digitando')).toBe(true);
     expect(isLiveOnly('mensagem_criada')).toBe(false);

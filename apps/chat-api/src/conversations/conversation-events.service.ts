@@ -46,6 +46,11 @@ export class ConversationEvents {
     await this.publishAll(recipients, { tipo: 'mensagem_editada', dados: { conversa_id: conversation.id, mensagem: message } });
   }
 
+  /** `mensagem_apagada` para cada participante, o autor inclusive: só a conversa e o id, nunca o texto. */
+  async messageDeleted(conversation: Pick<ConversationEntity, 'id'>, messageId: string, recipients: string[]) {
+    await this.publishAll(recipients, { tipo: 'mensagem_apagada', dados: { conversa_id: conversation.id, mensagem_id: messageId } });
+  }
+
   /** A pessoa leu a conversa: as contagens novas vão para todas as abas dela. */
   readCountsChanged(personId: string, conversationId: string, counts: ReadCounts) {
     return this.publishAll([personId], {

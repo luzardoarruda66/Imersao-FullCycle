@@ -16,5 +16,6 @@ export function as(t: TestApp, sid: string | undefined) {
     get: (path: string) => withCookie(t.http().get(path)),
     post: (path: string, body?: unknown) => withCookie(t.http().post(path)).send(body as object),
     patch: (path: string, body?: unknown) => withCookie(t.http().patch(path)).send(body as object),
+    delete: (path: string) => withCookie(t.http().delete(path)),
   };
 }

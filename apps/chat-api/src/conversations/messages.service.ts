@@ -42,7 +42,7 @@ export class MessagesService {
     const conversation = await this.access.requireAccess(conversationId, personId);
     if (before !== undefined) await this.requireMessageOf(this.dataSource.manager, conversation.id, before, 'antes');
     const rows = await this.dataSource.query<MessageRow[]>(
-      `SELECT m.id, m.text, m.created_at, m.edited_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
+      `SELECT m.id, m.text, m.created_at, m.edited_at, m.deleted_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
               q.id AS quote_id, q.text AS quote_text, q.deleted_at AS quote_deleted_at,
               qa.id AS quote_author_id, qa.name AS quote_author_name, qa.username AS quote_author_username
          FROM messages m JOIN people p ON p.id = m.author_id
@@ -167,6 +167,79 @@ export class MessagesService {
   }
 
   /**
+   * Apaga a própria mensagem (LLD, "Concorrência e idempotência"): só o autor, até `EDIT_WINDOW_MS` depois do envio.
+   * Zera o texto, grava `deleted_at`, remove as menções e desconta `nao_lidas` de quem ainda não leu a mensagem, e
+   * `mencoes` de cada mencionado que também não leu, nunca abaixo de zero. Tudo na mesma transação, com a linha
+   * da mensagem travada: apagar de novo (em sequência ou ao mesmo tempo) devolve sucesso sem alterar nem publicar.
+   * O evento sai só depois do commit (ADR 0025) e leva só o id: o texto nunca viaja.
+   */
+  async remove(conversationId: string, personId: string, messageId: string): Promise<ChatMessage> {
+    const conversation = await this.access.requireAccess(conversationId, personId);
+    if (!UUID.test(messageId)) throw messageNotFound();
+    const everyone = await this.access.participantIds(conversation);
+
+    // `null` quando a mensagem já estava apagada (nada muda); senão, as contagens novas de quem teve contador alterado.
+    const countsChanged = await this.dataSource.transaction(async (manager) => {
+      const [row] = await manager.query<{ created_at: Date; author_id: string; deleted_at: Date | null }[]>(
+        `SELECT created_at, author_id, deleted_at FROM messages WHERE id = $1 AND conversation_id = $2 FOR UPDATE`,
+        [messageId, conversation.id],
+      );
+      if (!row) throw messageNotFound();
+      if (row.author_id !== personId) throw new AppError('mensagem_de_outra_pessoa', 403, 'Só quem escreveu a mensagem pode apagá-la.');
+      if (row.deleted_at !== null) return null;
+      if (this.clock.now() - row.created_at.getTime() > EDIT_WINDOW_MS) {
+        throw new AppError('prazo_encerrado', 422, 'O prazo para apagar esta mensagem acabou.', { prazo_segundos: EDIT_WINDOW_MS / 1000 });
+      }
+
+      const mentioned = (await manager.query<{ person_id: string }[]>(`SELECT person_id FROM mentions WHERE message_id = $1`, [messageId])).map((r) => r.person_id);
+      await manager.update(MessageEntity, messageId, { text: '', deletedAt: new Date(this.clock.now()) });
+      await manager.query(`DELETE FROM mentions WHERE message_id = $1`, [messageId]);
+      return this.discountCounts(manager, conversation.id, messageId, personId, mentioned);
+    });
+
+    const message = await this.messageById(conversation.id, messageId);
+    if (countsChanged === null) return message;
+    await this.events.messageDeleted(conversation, messageId, everyone);
+    await Promise.all([...countsChanged].map(([id, counts]) => this.events.readCountsChanged(id, conversation.id, counts)));
+    return message;
+  }
+
+  /**
+   * Desconta a mensagem apagada de quem ainda não a leu (a posição de leitura é anterior a ela): 1 de `nao_lidas` e,
+   * se foi mencionado, 1 de `mencoes`, nunca abaixo de zero. O autor nunca contou a própria. As linhas são travadas
+   * em ordem de pessoa, como no envio. Devolve as contagens de quem mudou.
+   */
+  private async discountCounts(
+    manager: EntityManager,
+    conversationId: string,
+    messageId: string,
+    authorId: string,
+    mentionedIds: string[],
+  ): Promise<Map<string, ReadCounts>> {
+    const updated = await manager.query<CountRow[]>(
+      `WITH locked AS (
+         SELECT rs.person_id FROM conversation_read_states rs
+          WHERE rs.conversation_id = $1 AND rs.person_id <> $4
+            AND (rs.last_read_message_id IS NULL
+                 OR (SELECT (c.created_at, c.id) FROM messages c WHERE c.id = rs.last_read_message_id)
+                  < (SELECT (a.created_at, a.id) FROM messages a WHERE a.id = $3))
+          ORDER BY rs.person_id
+            FOR UPDATE)
+       UPDATE conversation_read_states rs
+          SET unread_count = GREATEST(rs.unread_count - 1, 0),
+              mention_count = GREATEST(rs.mention_count - (CASE WHEN rs.person_id = ANY($2::uuid[]) THEN 1 ELSE 0 END), 0),
+              updated_at = now()
+         FROM locked
+        WHERE rs.conversation_id = $1 AND rs.person_id = locked.person_id
+    RETURNING rs.person_id, rs.unread_count, rs.mention_count`,
+      [conversationId, mentionedIds, messageId, authorId],
+    );
+    // O driver devolve `[linhas, quantidade]` no UPDATE ... RETURNING.
+    const rows = (Array.isArray(updated[0]) ? updated[0] : updated) as CountRow[];
+    return new Map(rows.map((r) => [r.person_id, toCounts(r)]));
+  }
+
+  /**
    * Soma 1 a `mencoes` de quem passou a ser mencionado e desconta 1 de quem deixou de ser, só de quem ainda não leu a
    * mensagem (a posição de leitura é anterior a ela), nunca abaixo de zero. As linhas são travadas em ordem de pessoa,
    * como no envio, para duas transações nunca se esperarem em ciclo. Devolve as contagens de quem mudou.
@@ -206,7 +279,7 @@ export class MessagesService {
   /** Uma mensagem no formato da API, com as menções e a citação. */
   private async messageById(conversationId: string, messageId: string): Promise<ChatMessage> {
     const [row] = await this.dataSource.query<MessageRow[]>(
-      `SELECT m.id, m.text, m.created_at, m.edited_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
+      `SELECT m.id, m.text, m.created_at, m.edited_at, m.deleted_at, p.id AS author_id, p.name AS author_name, p.username AS author_username,
               q.id AS quote_id, q.text AS quote_text, q.deleted_at AS quote_deleted_at,
               qa.id AS quote_author_id, qa.name AS quote_author_name, qa.username AS quote_author_username
          FROM messages m JOIN people p ON p.id = m.author_id
@@ -244,7 +317,7 @@ export class MessagesService {
             SET last_read_message_id = $3,
                 unread_count = (
                   SELECT count(*)::int FROM messages m
-                   WHERE m.conversation_id = $1 AND m.author_id <> $2
+                   WHERE m.conversation_id = $1 AND m.author_id <> $2 AND m.deleted_at IS NULL
                      AND (m.created_at, m.id) > (SELECT a.created_at, a.id FROM messages a WHERE a.id = $3)),
                 mention_count = (
                   SELECT count(*)::int FROM mentions mn JOIN messages m ON m.id = mn.message_id
@@ -298,6 +371,7 @@ interface MessageRow {
   text: string;
   created_at: Date;
   edited_at?: Date | null;
+  deleted_at?: Date | null;
   author_id: string;
   author_name: string;
   author_username: string;
@@ -359,16 +433,17 @@ interface CountRow {
 const toCounts = (row: CountRow): ReadCounts => ({ nao_lidas: row.unread_count, mencoes: row.mention_count });
 
 function toChatMessage(conversationId: string, row: MessageRow, mencoes: MentionRef[] = []): ChatMessage {
+  const deleted = row.deleted_at !== null && row.deleted_at !== undefined;
   return {
     id: row.id,
     conversa_id: conversationId,
     autor: { id: row.author_id, nome: row.author_name, usuario: row.author_username },
-    texto: row.text,
+    // A mensagem apagada não leva texto, menções nem citação: o que ela dizia nunca sai pela API.
+    texto: deleted ? '' : row.text,
     criada_em: row.created_at.toISOString(),
-    mencoes,
-    citacao: toQuote(row),
+    mencoes: deleted ? [] : mencoes,
+    citacao: deleted ? null : toQuote(row),
     editada_em: row.edited_at ? row.edited_at.toISOString() : null,
-    // Preenchido pela tarefa de exclusão da F1-05.
-    apagada: false,
+    apagada: deleted,
   };
 }

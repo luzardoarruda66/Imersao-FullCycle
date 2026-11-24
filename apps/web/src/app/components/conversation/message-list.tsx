@@ -1,13 +1,16 @@
 "use client";
 
 import type { ChatMessage } from "chat-events";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Copy } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { MessageActions, type MessageAction } from "@/app/components/conversation/message-actions";
 import { MessageText } from "@/app/components/conversation/message-text";
 import { Avatar } from "@/app/components/ui/avatar";
 import { Button } from "@/app/components/ui/button";
 import { Spinner } from "@/app/components/ui/spinner";
 import { useMounted } from "@/app/utils/use-mounted";
+import { copyText } from "@/lib/clipboard";
 import { formatTime, groupByDay } from "@/lib/messages";
 
 /** A folga, em pixels, em que a rolagem ainda conta como "no fim". */
@@ -15,9 +18,25 @@ const BOTTOM_SLACK = 24;
 /** A distância do começo, em pixels, a partir da qual a rolagem pede a página anterior. */
 const TOP_TRIGGER = 48;
 
+/** As ações da mensagem, na ordem da barra e do menu. A mensagem apagada não tem nenhuma. */
+function actionsOf(message: ChatMessage): MessageAction[] {
+  if (message.apagada) return [];
+  return [
+    {
+      id: "copy",
+      label: "Copiar texto",
+      icon: Copy,
+      onSelect: async () => {
+        if (await copyText(message.texto)) toast.success("Texto copiado");
+        else toast.error("Não foi possível copiar o texto");
+      },
+    },
+  ];
+}
+
 function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessage; mounted: boolean; currentMemberId?: string }) {
   return (
-    <li className="flex gap-3 px-4 py-1">
+    <li className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
       <Avatar name={message.autor.nome} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline gap-2">
@@ -27,10 +46,15 @@ function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessa
             {mounted ? formatTime(new Date(message.criada_em)) : ""}
           </time>
         </div>
-        <p className="text-body break-words whitespace-pre-wrap text-fg">
-          <MessageText text={message.texto} mentions={message.mencoes} currentMemberId={currentMemberId} />
-        </p>
+        {message.apagada ? (
+          <p className="text-body text-fg-muted">Mensagem apagada</p>
+        ) : (
+          <p className="text-body break-words whitespace-pre-wrap text-fg">
+            <MessageText text={message.texto} mentions={message.mencoes} currentMemberId={currentMemberId} />
+          </p>
+        )}
       </div>
+      <MessageActions actions={actionsOf(message)} />
     </li>
   );
 }

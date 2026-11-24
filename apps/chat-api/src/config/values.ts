@@ -10,7 +10,12 @@ export const SESSION_COOKIE_NAME = 'sid';
 // Conversas (LLD, seção 9, "Valores e configuração").
 export const CHANNEL_NAME_MAX = 80;
 export const MESSAGE_TEXT_MAX = 4000;
-export const MESSAGES_PER_READ = 50;
+/** Tamanho da página do histórico, também a leitura sem âncora (as mais recentes). */
+export const MESSAGES_PER_PAGE = 50;
+/** Acima deste número de membros, o "digitando" não é repassado. */
+export const TYPING_MEMBER_LIMIT = 15;
+/** Intervalo mínimo entre dois "digitando" da mesma pessoa na mesma conversa; o repetido antes disso é ignorado. */
+export const TYPING_MIN_INTERVAL_MS = 1000;
 export const INVITE_MAX = 100;
 
 // Tempo real (LLD, seção 9, "Valores e configuração").

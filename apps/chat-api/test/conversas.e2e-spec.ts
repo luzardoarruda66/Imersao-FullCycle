@@ -79,7 +79,7 @@ describe('Conversas (e2e HTTP)', () => {
       expect(res.status).toBe(200);
       expect(res.body.canais_publicos.map((c: { nome: string }) => c.nome)).toEqual(['Alfa', 'zeta']);
       expect(res.body.canais_privados.map((c: { nome: string }) => c.nome)).toEqual(['Acervo', 'beta']);
-      expect(res.body.diretas).toEqual([{ id: direta.body.id, tipo: 'direta', nome: 'Bia' }]);
+      expect(res.body.diretas).toEqual([{ id: direta.body.id, tipo: 'direta', nome: 'Bia', nao_lidas: 0, mencoes: 0 }]);
     });
 
     it('mostra o canal público de outro membro, mas não o privado nem a direta alheios', async () => {

@@ -3,11 +3,25 @@ import { z } from 'zod';
 /** Nomes das mensagens do servidor para o cliente (LLD, seção 2, "Eventos por pessoa (Redis)"). */
 export const SERVER_MESSAGES = { event: 'evento', ready: 'pronto', lost: 'perdido' } as const;
 
+/** Nomes das mensagens do cliente para o servidor (F1-04). */
+export const CLIENT_MESSAGES = { typing: 'digitando' } as const;
+
+/** As contagens da pessoa numa conversa: nunca negativas. */
+export const readCountsSchema = z.object({
+  nao_lidas: z.number().int().min(0),
+  mencoes: z.number().int().min(0),
+});
+export type ReadCounts = z.infer<typeof readCountsSchema>;
+
+/** A mensagem do cliente `digitando`: a conversa em que a pessoa digita. */
+export const typingMessageSchema = z.object({ conversa_id: z.string().min(1) });
+export type TypingMessage = z.infer<typeof typingMessageSchema>;
+
 /** Uma mensagem de conversa como a API do chat a devolve e o evento `mensagem_criada` a carrega. */
 export const chatMessageSchema = z.object({
   id: z.string().min(1),
   conversa_id: z.string().min(1),
-  autor: z.object({ id: z.string().min(1), nome: z.string() }),
+  autor: z.object({ id: z.string().min(1), nome: z.string(), usuario: z.string().min(1) }),
   texto: z.string(),
   criada_em: z.string().min(1),
 });
@@ -17,12 +31,26 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export const eventDataSchemas = {
   diagnostico: z.object({ mensagem: z.string() }),
   /** Uma mensagem nova numa conversa que a pessoa vê. */
-  mensagem_criada: z.object({ conversa_id: z.string().min(1), mensagem: chatMessageSchema }),
+  mensagem_criada: z.object({
+    conversa_id: z.string().min(1),
+    mensagem: chatMessageSchema,
+    /** As contagens da pessoa que recebe o evento, já com a soma desta mensagem. */
+    contagens: readCountsSchema,
+  }),
+  /** A pessoa leu a conversa (em outra aba): as contagens novas dela. */
+  contagem_atualizada: z.object({ conversa_id: z.string().min(1) }).extend(readCountsSchema.shape),
+  /** Alguém digita na conversa. Só ao vivo: não entra na reposição depois de uma queda. */
+  digitando: z.object({ conversa_id: z.string().min(1), pessoa: z.object({ id: z.string().min(1), usuario: z.string().min(1) }) }),
   /** A pessoa passou a ver uma conversa (canal novo, conversa direta aberta ou convite recebido): a lista muda. */
   conversa_visivel: z.object({ conversa_id: z.string().min(1) }),
 } as const;
 
 export type EventType = keyof typeof eventDataSchemas;
+
+/** Eventos que só saem ao vivo: não são guardados para a reposição depois de uma queda. */
+export function isLiveOnly(type: EventType): boolean {
+  return type === 'digitando';
+}
 
 const envelopeBase = { id: z.string().min(1), momento: z.string().min(1) };
 
@@ -31,6 +59,8 @@ export const chatEventSchema = z.discriminatedUnion('tipo', [
   z.object({ ...envelopeBase, tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
   z.object({ ...envelopeBase, tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
   z.object({ ...envelopeBase, tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
+  z.object({ ...envelopeBase, tipo: z.literal('contagem_atualizada'), dados: eventDataSchemas.contagem_atualizada }),
+  z.object({ ...envelopeBase, tipo: z.literal('digitando'), dados: eventDataSchemas.digitando }),
 ]);
 export type ChatEvent = z.infer<typeof chatEventSchema>;
 
@@ -39,6 +69,8 @@ export const chatEventDraftSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
   z.object({ tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
   z.object({ tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
+  z.object({ tipo: z.literal('contagem_atualizada'), dados: eventDataSchemas.contagem_atualizada }),
+  z.object({ tipo: z.literal('digitando'), dados: eventDataSchemas.digitando }),
 ]);
 export type ChatEventDraft = z.infer<typeof chatEventDraftSchema>;
 

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { chatEventDraftSchema, chatEventSchema, compareEventIds, formatEventId, isNewerEventId, parseEventId } from './index.js';
+import {
+  CLIENT_MESSAGES,
+  chatEventDraftSchema,
+  chatEventSchema,
+  compareEventIds,
+  formatEventId,
+  isLiveOnly,
+  isNewerEventId,
+  parseEventId,
+  readCountsSchema,
+  typingMessageSchema,
+} from './index.js';
 
 describe('chat-events', () => {
   it('valida o evento de diagnóstico com o envelope', () => {
@@ -11,15 +22,71 @@ describe('chat-events', () => {
     const mensagem = {
       id: 'm1',
       conversa_id: 'c1',
-      autor: { id: 'p1', nome: 'Ana' },
+      autor: { id: 'p1', nome: 'Ana', usuario: 'ana' },
       texto: 'oi',
       criada_em: '2026-11-24T00:00:00.000Z',
     };
     const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
-    expect(chatEventSchema.parse({ ...base, tipo: 'mensagem_criada', dados: { conversa_id: 'c1', mensagem } }).tipo).toBe('mensagem_criada');
+    expect(chatEventSchema.parse({ ...base, tipo: 'mensagem_criada', dados: { conversa_id: 'c1', mensagem, contagens: { nao_lidas: 1, mencoes: 0 } } }).tipo).toBe('mensagem_criada');
     expect(chatEventSchema.parse({ ...base, tipo: 'conversa_visivel', dados: { conversa_id: 'c1' } }).tipo).toBe('conversa_visivel');
     expect(chatEventDraftSchema.safeParse({ tipo: 'mensagem_criada', dados: { conversa_id: 'c1' } }).success).toBe(false);
     expect(chatEventDraftSchema.safeParse({ tipo: 'conversa_visivel', dados: {} }).success).toBe(false);
+  });
+
+  it('valida os eventos da F1-04: contagem atualizada e digitando', () => {
+    const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
+    const counts = { conversa_id: 'c1', nao_lidas: 0, mencoes: 0 };
+    expect(chatEventSchema.parse({ ...base, tipo: 'contagem_atualizada', dados: counts }).tipo).toBe('contagem_atualizada');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'contagem_atualizada', dados: { ...counts, nao_lidas: -1 } }).success).toBe(false);
+    const typing = { conversa_id: 'c1', pessoa: { id: 'p1', usuario: 'ana' } };
+    expect(chatEventSchema.parse({ ...base, tipo: 'digitando', dados: typing }).tipo).toBe('digitando');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'digitando', dados: { conversa_id: 'c1' } }).success).toBe(false);
+  });
+
+  it('só o digitando é ao vivo; os outros eventos entram na reposição', () => {
+    expect(isLiveOnly('digitando')).toBe(true);
+    expect(isLiveOnly('mensagem_criada')).toBe(false);
+    expect(isLiveOnly('contagem_atualizada')).toBe(false);
+  });
+
+  it('valida a mensagem do cliente digitando', () => {
+    expect(CLIENT_MESSAGES.typing).toBe('digitando');
+    expect(typingMessageSchema.safeParse({ conversa_id: 'c1' }).success).toBe(true);
+    expect(typingMessageSchema.safeParse({}).success).toBe(false);
+    expect(typingMessageSchema.safeParse({ conversa_id: 1 }).success).toBe(false);
+  });
+
+  it('valida o corpo da leitura e a resposta com contagens', () => {
+    expect(readCountsSchema.parse({ nao_lidas: 2, mencoes: 0 })).toEqual({ nao_lidas: 2, mencoes: 0 });
+    expect(readCountsSchema.safeParse({ nao_lidas: 2.5, mencoes: 0 }).success).toBe(false);
+  });
+
+  it('valida os eventos da F1-04: contagem atualizada e digitando', () => {
+    const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
+    const counts = { conversa_id: 'c1', nao_lidas: 0, mencoes: 0 };
+    expect(chatEventSchema.parse({ ...base, tipo: 'contagem_atualizada', dados: counts }).tipo).toBe('contagem_atualizada');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'contagem_atualizada', dados: { ...counts, nao_lidas: -1 } }).success).toBe(false);
+    const typing = { conversa_id: 'c1', pessoa: { id: 'p1', usuario: 'ana' } };
+    expect(chatEventSchema.parse({ ...base, tipo: 'digitando', dados: typing }).tipo).toBe('digitando');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'digitando', dados: { conversa_id: 'c1' } }).success).toBe(false);
+  });
+
+  it('só o digitando é ao vivo; os outros eventos entram na reposição', () => {
+    expect(isLiveOnly('digitando')).toBe(true);
+    expect(isLiveOnly('mensagem_criada')).toBe(false);
+    expect(isLiveOnly('contagem_atualizada')).toBe(false);
+  });
+
+  it('valida a mensagem do cliente digitando', () => {
+    expect(CLIENT_MESSAGES.typing).toBe('digitando');
+    expect(typingMessageSchema.safeParse({ conversa_id: 'c1' }).success).toBe(true);
+    expect(typingMessageSchema.safeParse({}).success).toBe(false);
+    expect(typingMessageSchema.safeParse({ conversa_id: 1 }).success).toBe(false);
+  });
+
+  it('valida as contagens', () => {
+    expect(readCountsSchema.parse({ nao_lidas: 2, mencoes: 0 })).toEqual({ nao_lidas: 2, mencoes: 0 });
+    expect(readCountsSchema.safeParse({ nao_lidas: 2.5, mencoes: 0 }).success).toBe(false);
   });
 
   it('recusa tipo desconhecido e dados fora do formato', () => {

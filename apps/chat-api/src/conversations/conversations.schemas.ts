@@ -19,5 +19,13 @@ export type OpenDirectDto = z.infer<typeof openDirectSchema>;
 export const inviteSchema = z.object({ membros_ids: z.array(memberId).min(1).max(INVITE_MAX) });
 export type InviteDto = z.infer<typeof inviteSchema>;
 
+/** A âncora do histórico: o id de uma mensagem da própria conversa (a conferência da conversa é do serviço). */
+export const listMessagesSchema = z.object({ antes: memberId.optional() });
+export type ListMessagesDto = z.infer<typeof listMessagesSchema>;
+
+/** A mensagem até onde a pessoa leu. */
+export const readSchema = z.object({ mensagem_id: memberId });
+export type ReadDto = z.infer<typeof readSchema>;
+
 export const sendMessageSchema = z.object({ texto: z.string().trim().min(1).max(MESSAGE_TEXT_MAX) });
 export type SendMessageDto = z.infer<typeof sendMessageSchema>;

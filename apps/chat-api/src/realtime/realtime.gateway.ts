@@ -9,6 +9,7 @@ import type { Member } from '../auth/member.js';
 import { Clock } from '../clock.js';
 import type { Env } from '../config/env.js';
 import { SESSION_CHECK_INTERVAL_MS, SESSION_IDLE_MS } from '../config/values.js';
+import { ClientMessageRouter } from './client-message-router.js';
 import { ConnectionRegistry, type Connection, personRoom, replayRoom } from './connection-registry.js';
 import { PersonEventsStore } from './person-events.store.js';
 
@@ -35,6 +36,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     private readonly connections: ConnectionRegistry,
     private readonly sessions: TypeOrmSessionStore,
     private readonly clock: Clock,
+    private readonly router: ClientMessageRouter,
   ) {}
 
   afterInit(server: Server) {
@@ -69,6 +71,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     // Na sala da pessoa desde o início; a sala de reposição a deixa fora da entrega ao vivo até a reposição acabar.
     await socket.join([personRoom(personId), replayRoom(personId)]);
     socket.on('disconnect', () => this.connections.remove(connection));
+    for (const type of this.router.types()) {
+      socket.on(type, (payload: unknown) => void this.router.handle(type, personId, payload));
+    }
     try {
       await this.start(connection, handshakeAuthSchema.safeParse(socket.handshake.auth).data?.ultimo_evento);
     } catch (error) {

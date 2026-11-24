@@ -18,10 +18,13 @@ export function MessageComposer({
   conversationId,
   placeholder,
   onSent,
+  onTyping,
 }: {
   conversationId: string;
   placeholder: string;
   onSent: (message: ChatMessage) => void;
+  /** Chamado quando a pessoa digita texto; quem usa limita a frequência. */
+  onTyping?: () => void;
 }) {
   const [text, setText] = useState("");
   const form = useRef<HTMLFormElement>(null);
@@ -59,7 +62,11 @@ export function MessageComposer({
           placeholder={placeholder}
           rows={1}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            // Só com texto: o campo vazio ou de espaços não avisa ninguém.
+            if (event.target.value.trim().length > 0) onTyping?.();
+          }}
           onKeyDown={(event) => {
             // Enter envia; Shift+Enter quebra a linha; Enter durante a composição de uma tecla morta ou IME não envia.
             if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;

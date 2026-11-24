@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CLIENT_MESSAGES,
   chatEventDraftSchema,
+  chatMessageSchema,
   chatEventSchema,
   compareEventIds,
   formatEventId,
@@ -41,6 +42,29 @@ describe('chat-events', () => {
     const typing = { conversa_id: 'c1', pessoa: { id: 'p1', usuario: 'ana' } };
     expect(chatEventSchema.parse({ ...base, tipo: 'digitando', dados: typing }).tipo).toBe('digitando');
     expect(chatEventDraftSchema.safeParse({ tipo: 'digitando', dados: { conversa_id: 'c1' } }).success).toBe(false);
+  });
+
+  it('valida o formato da mensagem da F1-05: menções, citação, edição e exclusão', () => {
+    const base = {
+      id: 'm1',
+      conversa_id: 'c1',
+      autor: { id: 'p1', nome: 'Ana', usuario: 'ana' },
+      texto: 'oi @bia',
+      criada_em: '2026-11-24T00:00:00.000Z',
+    };
+    // Sem os campos novos (evento guardado antes da F1-05), assume os valores vazios.
+    expect(chatMessageSchema.parse(base)).toEqual({ ...base, mencoes: [], citacao: null, editada_em: null, apagada: false });
+    const full = {
+      ...base,
+      mencoes: [{ id: 'p2', usuario: 'bia' }],
+      citacao: { id: 'm0', autor: { id: 'p2', nome: 'Bia', usuario: 'bia' }, trecho: 'olá', apagada: false },
+      editada_em: '2026-11-24T00:01:00.000Z',
+      apagada: false,
+    };
+    expect(chatMessageSchema.parse(full)).toEqual(full);
+    expect(chatMessageSchema.safeParse({ ...full, mencoes: [{ id: 'p2' }] }).success).toBe(false);
+    expect(chatMessageSchema.safeParse({ ...full, citacao: { id: 'm0' } }).success).toBe(false);
+    expect(chatMessageSchema.safeParse({ ...full, apagada: 'sim' }).success).toBe(false);
   });
 
   it('só o digitando é ao vivo; os outros eventos entram na reposição', () => {

@@ -17,13 +17,33 @@ export type ReadCounts = z.infer<typeof readCountsSchema>;
 export const typingMessageSchema = z.object({ conversa_id: z.string().min(1) });
 export type TypingMessage = z.infer<typeof typingMessageSchema>;
 
-/** Uma mensagem de conversa como a API do chat a devolve e o evento `mensagem_criada` a carrega. */
+const memberRefSchema = z.object({ id: z.string().min(1), nome: z.string(), usuario: z.string().min(1) });
+
+/** A mensagem que outra cita: o autor e um trecho do texto atual; apagada, sem texto (F1-05). */
+export const quoteSchema = z.object({
+  id: z.string().min(1),
+  autor: memberRefSchema,
+  trecho: z.string(),
+  apagada: z.boolean(),
+});
+export type Quote = z.infer<typeof quoteSchema>;
+
+/**
+ * Uma mensagem de conversa como a API do chat a devolve e os eventos de mensagem a carregam: um schema só, no envio,
+ * no histórico e nos eventos. Os campos da F1-05 assumem o valor vazio quando faltam, para repor sem erro um evento
+ * guardado antes dela.
+ */
 export const chatMessageSchema = z.object({
   id: z.string().min(1),
   conversa_id: z.string().min(1),
-  autor: z.object({ id: z.string().min(1), nome: z.string(), usuario: z.string().min(1) }),
+  autor: memberRefSchema,
   texto: z.string(),
   criada_em: z.string().min(1),
+  /** As pessoas mencionadas, para o cliente destacar só as menções reais. */
+  mencoes: z.array(memberRefSchema.pick({ id: true, usuario: true })).default([]),
+  citacao: quoteSchema.nullable().default(null),
+  editada_em: z.string().min(1).nullable().default(null),
+  apagada: z.boolean().default(false),
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 

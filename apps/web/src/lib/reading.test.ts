@@ -42,6 +42,23 @@ describe("fetchMessagePage", () => {
       criada_em: "2026-11-24T10:00:00.000Z",
     };
     const body = { mensagens: [message], tem_mais: true };
+    // Uma mensagem sem os campos da F1-05 (menções, citação, edição, exclusão) chega com os valores vazios.
+    const empty = { mencoes: [], citacao: null, editada_em: null, apagada: false };
+    expect(await fetchMessagePage("c1", "m2", ok(body))).toEqual({ mensagens: [{ ...message, ...empty }], tem_mais: true });
+  });
+  it("aceita a mensagem com menção, citação, edição e exclusão", async () => {
+    const message = {
+      id: "m1",
+      conversa_id: "c1",
+      autor: { id: "p1", nome: "Ana", usuario: "ana" },
+      texto: "oi @bia",
+      criada_em: "2026-11-24T10:00:00.000Z",
+      mencoes: [{ id: "p2", usuario: "bia" }],
+      citacao: { id: "m0", autor: { id: "p2", nome: "Bia", usuario: "bia" }, trecho: "olá", apagada: false },
+      editada_em: "2026-11-24T10:01:00.000Z",
+      apagada: false,
+    };
+    const body = { mensagens: [message], tem_mais: false };
     expect(await fetchMessagePage("c1", "m2", ok(body))).toEqual(body);
   });
   it("rejeita quando a resposta não é de sucesso", async () => {

@@ -1,3 +1,4 @@
+import { chatMessageSchema } from 'chat-events';
 import { v7 as uuidv7 } from 'uuid';
 import { MessageEntity } from '../src/database/entities/message.entity.js';
 import { as, signUp } from './support/http.js';
@@ -47,9 +48,16 @@ describe('Mensagens (e2e HTTP)', () => {
       autor: { id: ana.id, nome: 'Ana', usuario: 'ana' },
       texto: 'Bom dia, time',
       criada_em: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+      mencoes: [],
+      citacao: null,
+      editada_em: null,
+      apagada: false,
     });
     const list = await read(bia, canal);
     expect(list.body.mensagens).toEqual([res.body]);
+    // O envio e o histórico seguem o schema único do pacote, sem que ele preencha nada por conta própria.
+    expect(chatMessageSchema.parse(res.body)).toEqual(res.body);
+    expect(chatMessageSchema.parse(list.body.mensagens[0])).toEqual(list.body.mensagens[0]);
   });
 
   it('recusa mensagem vazia ou só de espaços e texto que não é string', async () => {

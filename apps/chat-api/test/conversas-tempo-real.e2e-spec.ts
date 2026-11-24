@@ -1,3 +1,4 @@
+import { chatMessageSchema } from 'chat-events';
 import { v7 as uuidv7 } from 'uuid';
 import { as, signUp } from './support/http.js';
 import { createTestApp, type ClientConnection, type TestApp } from './support/test-app.js';
@@ -29,6 +30,17 @@ describe('Conversas em tempo real (e2e Socket.IO)', () => {
     (await as(t, person.sid).post('/v1/conversas/canais', { nome, tipo })).body.id as string;
 
   describe('mensagem criada', () => {
+    it('o evento carrega a mensagem no formato único, com menções, citação, edição e exclusão vazias', async () => {
+      const id = await channel(ana, 'formato', 'publico');
+      const biaTab = await listen(bia);
+      await as(t, ana.sid).post(`/v1/conversas/${id}/mensagens`, { texto: 'Oi' });
+      await biaTab.waitFor(() => eventsOf(biaTab, 'mensagem_criada').length === 1);
+      const { mensagem } = eventsOf(biaTab, 'mensagem_criada')[0]!.dados as { mensagem: unknown };
+      expect(chatMessageSchema.parse(mensagem)).toMatchObject({ mencoes: [], citacao: null, editada_em: null, apagada: false });
+      // O servidor manda os campos novos de fato: o schema não os preencheu sozinho.
+      expect(mensagem).toMatchObject({ mencoes: [], citacao: null, editada_em: null, apagada: false });
+    });
+
     it('no canal público alcança todos os membros, inclusive as outras abas de quem enviou', async () => {
       const id = await channel(ana, 'geral', 'publico');
       const [anaTab1, anaTab2, biaTab, caioTab] = [await listen(ana), await listen(ana), await listen(bia), await listen(caio)];

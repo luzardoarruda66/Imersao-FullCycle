@@ -21,6 +21,16 @@ describe("MessageList", () => {
     expect(screen.getByRole("log").textContent).toContain("Oi @bia, escreva para caio@empresa.com ou @ninguem");
   });
 
+  it("destaca em amarelo a menção ao próprio membro, e em azul a das outras pessoas", () => {
+    const message = {
+      ...at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "@bia e @caio"),
+      mencoes: [{ id: "p2", usuario: "bia" }, { id: "p3", usuario: "caio" }],
+    };
+    render(<MessageList messages={[message]} intro={null} currentMemberId="p2" />);
+    expect(screen.getByText("@bia")).toHaveClass("bg-mention-self-bg", "text-mention-self-fg");
+    expect(screen.getByText("@caio")).toHaveClass("bg-mention-bg", "text-mention-fg");
+  });
+
   it("mostra autor, horário e texto de cada mensagem", () => {
     render(<MessageList messages={[at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "Bom dia")]} intro={null} />);
     expect(screen.getByText("Ana")).toBeInTheDocument();

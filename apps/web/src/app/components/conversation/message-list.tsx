@@ -15,7 +15,7 @@ const BOTTOM_SLACK = 24;
 /** A distância do começo, em pixels, a partir da qual a rolagem pede a página anterior. */
 const TOP_TRIGGER = 48;
 
-function MessageItem({ message, mounted }: { message: ChatMessage; mounted: boolean }) {
+function MessageItem({ message, mounted, currentMemberId }: { message: ChatMessage; mounted: boolean; currentMemberId?: string }) {
   return (
     <li className="flex gap-3 px-4 py-1">
       <Avatar name={message.autor.nome} />
@@ -28,7 +28,7 @@ function MessageItem({ message, mounted }: { message: ChatMessage; mounted: bool
           </time>
         </div>
         <p className="text-body break-words whitespace-pre-wrap text-fg">
-          <MessageText text={message.texto} mentions={message.mencoes} />
+          <MessageText text={message.texto} mentions={message.mencoes} currentMemberId={currentMemberId} />
         </p>
       </div>
     </li>
@@ -89,6 +89,7 @@ export function MessageList({
   loadError = false,
   onLoadOlder = () => {},
   onAtBottomChange = () => {},
+  currentMemberId,
 }: {
   messages: ChatMessage[];
   intro: React.ReactNode;
@@ -97,6 +98,8 @@ export function MessageList({
   loadError?: boolean;
   onLoadOlder?: () => void;
   onAtBottomChange?: (atBottom: boolean) => void;
+  /** O membro da sessão: a menção a ele ganha a cor própria. */
+  currentMemberId?: string;
 }) {
   const mounted = useMounted();
   const scroller = useRef<HTMLDivElement>(null);
@@ -170,7 +173,7 @@ export function MessageList({
                   )}
                   <ul>
                     {group.messages.map((message) => (
-                      <MessageItem key={message.id} message={message} mounted={mounted} />
+                      <MessageItem key={message.id} message={message} mounted={mounted} currentMemberId={currentMemberId} />
                     ))}
                   </ul>
                 </section>

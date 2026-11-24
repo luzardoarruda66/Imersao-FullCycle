@@ -1,4 +1,9 @@
-/** Os caracteres de um @usuário (LLD, "Valores e configuração", "Formato do @usuário"). */
+import type { ChatMessage } from "chat-events";
+
+/**
+ * Os caracteres de um @usuário (LLD, "Valores e configuração", "Formato do @usuário"). Quem decide o que é menção é a API
+ * (`mention-parser`, na `chat-api`); aqui só se acha de novo, no texto, o que ela já devolveu em `mencoes`.
+ */
 const USERNAME_CHARS = "a-z0-9._-";
 /** O `@` aberto logo antes do cursor: no começo do texto ou depois de algo que não é parte de um @usuário. */
 const OPEN_MENTION = new RegExp(`(?<![@${USERNAME_CHARS}])@([${USERNAME_CHARS}]*)$`, "i");
@@ -25,10 +30,8 @@ export function insertMention(text: string, open: Pick<OpenMention, "start" | "e
   return { text: text.slice(0, open.start) + inserted + text.slice(open.end), caret: open.start + inserted.length };
 }
 
-export interface MentionRef {
-  id: string;
-  usuario: string;
-}
+/** Uma pessoa mencionada, no formato da mensagem do `chat-events`. */
+export type MentionRef = ChatMessage["mencoes"][number];
 
 export type TextSegment = { text: string; mention?: MentionRef };
 

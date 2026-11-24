@@ -48,6 +48,7 @@ async function Conversation({ params }: { params: PageProps<"/conversas/[id]">["
         placeholder={detail.tipo === "direta" ? `Mensagem para ${detail.nome}` : `Mensagem para #${detail.nome}`}
         initialMessages={messages.data.mensagens}
         initialHasMore={messages.data.tem_mais}
+        currentMemberId={session.member.id}
         intro={<ConversationIntro type={detail.tipo} name={detail.nome} />}
       />
     </>

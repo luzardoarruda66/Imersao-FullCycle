@@ -5,7 +5,7 @@ import { SessionError } from "@/app/components/auth/session-error";
 import { RealtimeConnection } from "@/app/components/realtime/realtime-connection";
 import { Rail } from "@/app/components/workspace-nav/rail";
 import { Sidebar } from "@/app/components/workspace-nav/sidebar";
-import { getConversationList, getMembers } from "@/server/conversations";
+import { getConversationList } from "@/server/conversations";
 import { getSessionState } from "@/server/session";
 
 export default function LoggedLayout({ children }: { children: React.ReactNode }) {
@@ -25,16 +25,15 @@ async function Shell({ children }: { children: React.ReactNode }) {
   if (session.kind === "none") redirect("/sessao-encerrada?para=/");
   if (session.kind === "unavailable") return <SessionError />;
 
-  const [list, members] = await Promise.all([getConversationList(), getMembers()]);
+  const list = await getConversationList();
   if (list.kind === "invalid-session") redirect("/sessao-encerrada?para=/");
   // Sem a lista, a lateral mostra o erro e "Tentar de novo"; a queda da API não tira ninguém da sessão.
-  const others = members.kind === "ok" ? members.data.filter((member) => member.id !== session.member.id) : [];
 
   return (
     <div className="flex h-screen">
       <RealtimeConnection />
       <Rail memberName={session.member.nome} />
-      <Sidebar list={list.kind === "ok" ? list.data : null} members={others} />
+      <Sidebar list={list.kind === "ok" ? list.data : null} />
       <main aria-label="Conversa" className="flex min-w-0 flex-1 flex-col bg-surface">
         {children}
       </main>

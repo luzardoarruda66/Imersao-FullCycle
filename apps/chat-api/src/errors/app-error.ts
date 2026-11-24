@@ -14,6 +14,7 @@ export const ERROR_CODES = [
   'nome_canal_em_uso',
   'conversa_direta_consigo_mesmo',
   'conversa_nao_aceita_convite',
+  'pessoa_inexistente',
   'erro_interno',
 ] as const;
 

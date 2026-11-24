@@ -445,6 +445,56 @@
           "membros"
         ]
       }
+    },
+    "/v1/pessoas": {
+      "get": {
+        "operationId": "DirectoryController_search",
+        "parameters": [
+          {
+            "name": "busca",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string"
+            },
+            "description": "Parte do nome ou do @usuário; vazia lista os primeiros membros"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Buscar pessoas por parte do nome ou do @usuário",
+        "tags": [
+          "pessoas"
+        ]
+      }
+    },
+    "/v1/pessoas/{id}": {
+      "get": {
+        "operationId": "DirectoryController_profile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "O Perfil de um membro: nome, @usuário, cargo, telefone e status",
+        "tags": [
+          "pessoas"
+        ]
+      }
     }
   },
   "info": {
@@ -472,6 +522,7 @@
           "nome_canal_em_uso",
           "conversa_direta_consigo_mesmo",
           "conversa_nao_aceita_convite",
+          "pessoa_inexistente",
           "erro_interno"
         ]
       },

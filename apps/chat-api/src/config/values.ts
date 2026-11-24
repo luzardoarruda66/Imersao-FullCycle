@@ -22,3 +22,4 @@ export const SESSION_IDLE_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 // Contas (LLD, seção 9, "Valores e configuração").
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 30;
+export const PEOPLE_SEARCH_LIMIT = 20;

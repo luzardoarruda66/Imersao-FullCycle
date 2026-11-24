@@ -75,9 +75,12 @@ test.describe("Canais e conversas diretas", () => {
     ]);
 
     await ana.getByRole("button", { name: "Nova conversa" }).last().click();
-    // O seletor traz só o nome, e não o próprio membro.
-    await expect(ana.getByRole("button", { name: displayName("canais-a") })).toHaveCount(0);
-    await ana.getByRole("button", { name: displayName("canais-b") }).click();
+    // A busca não traz o próprio membro.
+    const search = ana.getByRole("searchbox", { name: "Buscar por nome ou @usuário" });
+    await search.fill(displayName("canais-a"));
+    await expect(ana.getByRole("heading", { name: "Ninguém encontrado" })).toBeVisible();
+    await search.fill(displayName("canais-b"));
+    await ana.getByRole("list", { name: "Pessoas" }).getByRole("button", { name: displayName("canais-b") }).click();
     await expect(ana).toHaveURL(/\/conversas\/[0-9a-f-]+$/);
     await expect(ana.getByRole("heading", { level: 1, name: displayName("canais-b") })).toBeVisible();
 
@@ -88,7 +91,8 @@ test.describe("Canais e conversas diretas", () => {
     const url = ana.url();
     await ana.goto("/");
     await ana.getByRole("button", { name: "Nova conversa" }).last().click();
-    await ana.getByRole("button", { name: displayName("canais-b") }).click();
+    await ana.getByRole("searchbox", { name: "Buscar por nome ou @usuário" }).fill(displayName("canais-b"));
+    await ana.getByRole("list", { name: "Pessoas" }).getByRole("button", { name: displayName("canais-b") }).click();
     await expect(ana).toHaveURL(url);
 
     await Promise.all([ana, bia, caio].map((page) => page.context().close()));
@@ -132,6 +136,7 @@ test.describe("Canais e conversas diretas", () => {
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Nova conversa" }).last().click();
     await expect(page.getByRole("dialog", { name: "Nova conversa" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Pessoas" }).getByRole("button").first()).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.context().close();
   });

@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { CreateChannelDialog } from "@/app/components/conversation/create-channel-dialog";
-import { NewDirectDialog } from "@/app/components/conversation/new-direct-dialog";
+import { PeopleSearchDialog } from "@/app/components/conversation/people-search-dialog";
 import { Avatar } from "@/app/components/ui/avatar";
 import { Button } from "@/app/components/ui/button";
 import { cn } from "@/app/utils/cn";
-import { conversationPath, type ConversationList, type ConversationSummary, type MemberOption } from "@/lib/conversations";
+import { conversationPath, type ConversationList, type ConversationSummary } from "@/lib/conversations";
 import { getRealtimeClient } from "@/lib/realtime/realtime";
 
 const ROW = "flex h-7 w-full items-center gap-2 rounded-item px-2 text-body transition-colors duration-100";
@@ -59,8 +59,8 @@ function RefreshOnNewConversation() {
   return null;
 }
 
-/** Lateral da casca (component `Sidebar`): canais públicos e privados, conversas diretas e as ações de criar e abrir. */
-export function Sidebar({ list, members }: { list: ConversationList | null; members: MemberOption[] }) {
+/** Lateral da casca (component `Sidebar`): canais públicos e privados, conversas diretas e as ações de criar e de buscar pessoas. */
+export function Sidebar({ list }: { list: ConversationList | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const [retrying, startRetry] = useTransition();
@@ -124,7 +124,7 @@ export function Sidebar({ list, members }: { list: ConversationList | null; memb
         )}
       </nav>
       <CreateChannelDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <NewDirectDialog open={directOpen} onOpenChange={setDirectOpen} members={members} />
+      <PeopleSearchDialog open={directOpen} onOpenChange={setDirectOpen} />
     </aside>
   );
 }

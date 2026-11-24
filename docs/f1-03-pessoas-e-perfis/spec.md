@@ -153,7 +153,7 @@ conversa ativa na lateral. Nenhum componente novo: tudo é instância de `Person
 - **Falha ao abrir:** texto de erro em linha dentro do diálogo, o mesmo padrão da F1-02, com o
   diálogo aberto.
 - **Perfil:** página com cabeçalho "Perfil" e, no corpo, `UserAvatar` `xl`, nome, `@usuário`, e os
-  campos Cargo, Telefone e Status, cada um com rótulo e valor, ou "Não informado" em `fg-subtle`. O
+  campos Cargo, Telefone e Status, cada um com rótulo e valor, ou "Não informado" em `fg-muted` (o `fg-subtle` não chega ao contraste de 4,5:1). O
   botão `Button` secondary `md` "Enviar mensagem" aparece nos Perfis de outras pessoas e some no
   próprio Perfil. Sem presença, sem e-mail e sem hora local (diferente do `ProfilePanel`, que fica
   para a F1-07). O estado "Não encontrado" usa `EmptyState` com o botão "Voltar ao início".
@@ -207,12 +207,15 @@ conversa ativa na lateral. Nenhum componente novo: tudo é instância de `Person
   erro novo em mensagem de tela.
 - **Busca:** o diálogo é um componente de cliente que lê por `GET /api/pessoas`, uma rota do BFF que
   repassa o cookie à API do chat, com SWR (LLD, "Cliente"). Cada digitação cancela a leitura
-  anterior. O termo e o resultado escolhido ficam no estado do diálogo.
+  anterior. A lista de resultados é uma lista comum de botões e links, com o foco movido pelas setas, e
+  não um `listbox`: o link "Ver perfil" ao lado de cada resultado não cabe dentro de um `listbox` (o axe
+  acusa `aria-required-children`). O termo e o resultado escolhido ficam no estado do diálogo.
 - **Abrir conversa direta:** uma Server Action chama `POST /v1/conversas/diretas` e redireciona para a
   conversa, a mesma da F1-02, agora chamada pelo diálogo e pelo Perfil (ADR 0024). Valida o id com Zod
   antes de chamar a API.
-- **Perfil:** página Server Component em `/pessoas/[id]`. Id sem resultado vira a tela de "não
-  encontrado" do Next. O botão de conversa direta fica oculto no Perfil do próprio membro, que a
+- **Perfil:** página Server Component em `/pessoas/[id]`. Id sem resultado mostra a tela de "não
+  encontrado" (frame `Pessoas / Perfil / Não encontrado`) no corpo da própria página, como a conversa
+  inexistente da F1-02. O botão de conversa direta fica oculto no Perfil do próprio membro, que a
   página reconhece pelo membro da sessão.
 - **Casca:** a seção "Conversas diretas" da lateral ganha o botão que abre o diálogo, no lugar do
   seletor da F1-02. O LLD passa as duas telas a `planejada` (feito nesta spec) e a `existe` quando a

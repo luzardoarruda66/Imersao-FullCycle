@@ -47,7 +47,7 @@ docker compose exec chat-api sh             # shell dentro do contêiner
 ```
 
 A app responde em http://localhost:3001.
-O pacote `packages/chat-events` é dependência local (`file:`): depois de mudá-lo, rode `pnpm install` dentro de `packages/chat-events` (ele compila para `dist/`) e reinstale em `chat-api` e `web`.
+O pacote `packages/chat-events` é dependência local (`file:`), e o serviço `chat-events` do Compose o compila para `dist/` e o recompila a cada mudança: a `chat-api` e o `web` leem o `dist` por hard link e enxergam a mudança sem reinstalar. Só um arquivo novo no pacote precisa de `pnpm install` dentro de `packages/chat-events` e reinstalação em `chat-api` e `web`. Os comandos que importam o pacote só rodam depois de o serviço ter feito o primeiro `dist`.
 Os testes E2E usam o banco lógico 1 do Redis, que o setup limpa.
 Testes e lint: `docker compose exec chat-api pnpm test`, `pnpm test:e2e`, `pnpm lint`.
 Os testes E2E usam o banco `chat_test`, que o setup cria e migra.

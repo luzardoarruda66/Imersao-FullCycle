@@ -1,6 +1,24 @@
 name: fullcycle-chat
 
 services:
+  # Compila o `packages/chat-events` para `dist/` e o recompila a cada mudança. A `chat-api` e o `web` leem o `dist` pelo
+  # hard link que o `pnpm install` do `file:` cria: o `tsc` reescreve cada arquivo no lugar, e os dois enxergam a mudança
+  # sem reinstalar. Arquivo novo no pacote não ganha o link: reinstale nos dois projetos (`AGENTS.md` da `chat-api`).
+  chat-events:
+    build:
+      context: ./apps/chat-api
+      dockerfile: Dockerfile.dev
+    working_dir: /workspace/packages/chat-events
+    volumes:
+      - .:/workspace
+    command: ["sh", "-c", "pnpm install && pnpm exec tsc -p tsconfig.json --watch --preserveWatchOutput"]
+    healthcheck:
+      # Saudável quando o primeiro `dist` existe: a `chat-api` e o `web` só instalam depois disso.
+      test: ["CMD-SHELL", "test -f dist/index.js"]
+      interval: 3s
+      timeout: 2s
+      retries: 60
+
   chat-api:
     build:
       context: ./apps/chat-api
@@ -19,6 +37,8 @@ services:
     ports:
       - "3001:3001"
     depends_on:
+      chat-events:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -40,7 +60,10 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - chat-api
+      chat-events:
+        condition: service_healthy
+      chat-api:
+        condition: service_started
 
   # Testes de navegador: imagem oficial do Playwright, fora da subida padrão (`scripts/e2e.sh`).
   e2e:

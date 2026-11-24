@@ -13,7 +13,7 @@ describe('Unicidade das conversas no banco (e2e)', () => {
       directKey: fields.directKey ?? null,
     });
 
-  const uniqueViolation = (promise: Promise<unknown>) =>
+  const sqlStateOf = (promise: Promise<unknown>) =>
     promise.then(
       () => undefined,
       (error: { driverError?: { code?: string }; code?: string }) => error.driverError?.code ?? error.code,
@@ -26,19 +26,19 @@ describe('Unicidade das conversas no banco (e2e)', () => {
 
   it('dois canais não têm o mesmo nome, sem diferenciar maiúsculas, nem entre público e privado', async () => {
     await insert('canal_publico', { name: 'Geral' });
-    expect(await uniqueViolation(insert('canal_publico', { name: 'geral' }))).toBe('23505');
-    expect(await uniqueViolation(insert('canal_privado', { name: 'GERAL' }))).toBe('23505');
-    expect(await uniqueViolation(insert('canal_publico', { name: 'Outro' }))).toBeUndefined();
+    expect(await sqlStateOf(insert('canal_publico', { name: 'geral' }))).toBe('23505');
+    expect(await sqlStateOf(insert('canal_privado', { name: 'GERAL' }))).toBe('23505');
+    expect(await sqlStateOf(insert('canal_publico', { name: 'Outro' }))).toBeUndefined();
   });
 
   it('um par de membros tem uma conversa direta só', async () => {
     await insert('direta', { directKey: 'a:b' });
-    expect(await uniqueViolation(insert('direta', { directKey: 'a:b' }))).toBe('23505');
-    expect(await uniqueViolation(insert('direta', { directKey: 'a:c' }))).toBeUndefined();
+    expect(await sqlStateOf(insert('direta', { directKey: 'a:b' }))).toBe('23505');
+    expect(await sqlStateOf(insert('direta', { directKey: 'a:c' }))).toBeUndefined();
   });
 
   it('o formato da linha é imposto: canal sem nome e direta com nome são recusados', async () => {
-    expect(await uniqueViolation(insert('canal_publico', {}))).toBe('23514');
-    expect(await uniqueViolation(insert('direta', { name: 'x', directKey: 'a:b' }))).toBe('23514');
+    expect(await sqlStateOf(insert('canal_publico', {}))).toBe('23514');
+    expect(await sqlStateOf(insert('direta', { name: 'x', directKey: 'a:b' }))).toBe('23514');
   });
 });

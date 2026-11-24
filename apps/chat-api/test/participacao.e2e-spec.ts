@@ -28,7 +28,7 @@ describe('Serviço de participação (e2e)', () => {
     return entity;
   };
 
-  const denied = async (conversationId: string, personId: string) => {
+  const denialOf = async (conversationId: string, personId: string) => {
     const error = await access.requireAccess(conversationId, personId).then(
       () => undefined,
       (e: unknown) => e,
@@ -57,7 +57,7 @@ describe('Serviço de participação (e2e)', () => {
     const bia = await person('bia@empresa.com', 'Bia');
     const canal = await conversation('canal_privado', [ana.id], 'segredo');
     expect((await access.requireAccess(canal.id, ana.id)).type).toBe('canal_privado');
-    await denied(canal.id, bia.id);
+    await denialOf(canal.id, bia.id);
   });
 
   it('conversa direta: só os dois da conversa entram', async () => {
@@ -66,7 +66,7 @@ describe('Serviço de participação (e2e)', () => {
     const caio = await person('caio@empresa.com', 'Caio');
     const direta = await conversation('direta', [ana.id, bia.id]);
     expect((await access.requireAccess(direta.id, bia.id)).id).toBe(direta.id);
-    await denied(direta.id, caio.id);
+    await denialOf(direta.id, caio.id);
   });
 
   it('quem está fora recebe a mesma resposta de um id que nunca existiu', async () => {
@@ -76,14 +76,14 @@ describe('Serviço de participação (e2e)', () => {
     const direta = await conversation('direta', [ana.id, bia.id]);
     const caio = await person('caio@empresa.com', 'Caio');
 
-    const inexistente = await denied(uuidv7(), caio.id);
+    const inexistente = await denialOf(uuidv7(), caio.id);
     expect(inexistente).toEqual({ code: 'conversa_inexistente', status: 404, message: expect.any(String) });
-    expect(await denied(privado.id, caio.id)).toEqual(inexistente);
-    expect(await denied(direta.id, caio.id)).toEqual(inexistente);
+    expect(await denialOf(privado.id, caio.id)).toEqual(inexistente);
+    expect(await denialOf(direta.id, caio.id)).toEqual(inexistente);
   });
 
   it('um id que não é UUID também responde como conversa inexistente', async () => {
     const ana = await person('ana@empresa.com', 'Ana');
-    expect(await denied('nao-e-uuid', ana.id)).toMatchObject({ code: 'conversa_inexistente', status: 404 });
+    expect(await denialOf('nao-e-uuid', ana.id)).toMatchObject({ code: 'conversa_inexistente', status: 404 });
   });
 });

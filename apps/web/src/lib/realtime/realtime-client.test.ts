@@ -138,4 +138,15 @@ describe("RealtimeClient", () => {
     client.start();
     expect(createSocket).toHaveBeenCalledTimes(2);
   });
+
+  it("cada aba lembra do próprio último evento, sem afetar a outra", () => {
+    const tabA = setup();
+    const tabB = setup();
+    tabA.client.start();
+    tabB.client.start();
+    tabA.sockets[0]!.fire("evento", diag("e-20-0"));
+    tabB.sockets[0]!.fire("evento", diag("e-5-0"));
+    expect(tabA.sockets[0]!.handshake()).toEqual({ ultimo_evento: "e-20-0" });
+    expect(tabB.sockets[0]!.handshake()).toEqual({ ultimo_evento: "e-5-0" });
+  });
 });

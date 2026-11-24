@@ -56,3 +56,11 @@ export function parseEventId(raw: string): ParsedEventId | null {
 export function compareEventIds(a: ParsedEventId, b: ParsedEventId): number {
   return a.time - b.time || a.seq - b.seq;
 }
+
+/** Se o evento `id` vem depois de `reference` na ordem da pessoa; outra época ou identificador ilegível vale como novo. */
+export function isNewerEventId(id: string, reference: string): boolean {
+  const a = parseEventId(id);
+  const b = parseEventId(reference);
+  if (!a || !b || a.epoch !== b.epoch) return true;
+  return compareEventIds(a, b) > 0;
+}

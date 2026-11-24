@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatEventDraftSchema, chatEventSchema, compareEventIds, formatEventId, parseEventId } from './index.js';
+import { chatEventDraftSchema, chatEventSchema, compareEventIds, formatEventId, isNewerEventId, parseEventId } from './index.js';
 
 describe('chat-events', () => {
   it('valida o evento de diagnóstico com o envelope', () => {
@@ -18,5 +18,13 @@ describe('chat-events', () => {
     expect(parseEventId('lixo')).toBeNull();
     expect(compareEventIds({ epoch: 'a', time: 10, seq: 1 }, { epoch: 'a', time: 10, seq: 2 })).toBeLessThan(0);
     expect(compareEventIds({ epoch: 'a', time: 11, seq: 0 }, { epoch: 'a', time: 10, seq: 9 })).toBeGreaterThan(0);
+  });
+
+  it('isNewerEventId compara na mesma época e trata outra época ou lixo como novo', () => {
+    expect(isNewerEventId('e-10-1', 'e-10-0')).toBe(true);
+    expect(isNewerEventId('e-10-1', 'e-10-1')).toBe(false);
+    expect(isNewerEventId('e-9-5', 'e-10-0')).toBe(false);
+    expect(isNewerEventId('x-1-0', 'e-10-0')).toBe(true);
+    expect(isNewerEventId('lixo', 'e-10-0')).toBe(true);
   });
 });

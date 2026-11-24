@@ -83,6 +83,28 @@ describe('Tempo real (e2e Socket.IO)', () => {
       expect(a1.events).toHaveLength(1);
     });
 
+    it('guarda para cada pessoa o conteúdo publicado para ela, e a reposição o devolve igual', async () => {
+      const anaSid = await login(ANA);
+      const biaSid = await login(BIA, '10.0.0.2');
+      const [ana, bia] = [await t.connect({ cookie: anaSid }), await t.connect({ cookie: biaSid })];
+      await ana.waitFor(() => ana.ready.length === 1);
+      await bia.waitFor(() => bia.ready.length === 1);
+      const [anaStart, biaStart] = [ana.ready[0]!.ultimo_evento!, bia.ready[0]!.ultimo_evento!];
+      ana.close();
+      bia.close();
+      // O chamador monta a versão de cada destinatário (ADR 0020); o canal guarda o que recebeu.
+      await diagnostics.publish(anaId, 'conteúdo completo');
+      await diagnostics.publish(biaId, 'versão bloqueada');
+      const [anaBack, biaBack] = [
+        await t.connect({ cookie: anaSid, lastEvent: anaStart }),
+        await t.connect({ cookie: biaSid, lastEvent: biaStart }),
+      ];
+      await anaBack.waitFor(() => anaBack.ready.length === 1);
+      await biaBack.waitFor(() => biaBack.ready.length === 1);
+      expect(anaBack.events.map((e) => e.dados.mensagem)).toEqual(['conteúdo completo']);
+      expect(biaBack.events.map((e) => e.dados.mensagem)).toEqual(['versão bloqueada']);
+    });
+
     it('recusa publicar um evento fora do formato, antes de qualquer saída', async () => {
       const c = await t.connect({ cookie: await login(ANA) });
       await c.waitFor(() => c.ready.length === 1);

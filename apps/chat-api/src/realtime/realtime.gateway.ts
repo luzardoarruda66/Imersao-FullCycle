@@ -2,14 +2,14 @@ import { Logger, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WsAuthenticator, type SessionRecord } from '@nestjs/authentication';
 import { type OnGatewayConnection, type OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { SERVER_MESSAGES, handshakeAuthSchema } from 'chat-events';
+import { SERVER_MESSAGES, handshakeAuthSchema, isNewerEventId } from 'chat-events';
 import type { Server, Socket } from 'socket.io';
 import { TypeOrmSessionStore } from '../auth/typeorm-session.store.js';
 import type { Member } from '../auth/member.js';
 import { Clock } from '../clock.js';
 import type { Env } from '../config/env.js';
 import { SESSION_CHECK_INTERVAL_MS, SESSION_IDLE_MS } from '../config/values.js';
-import { ConnectionRegistry, type Connection, isAfter } from './connection-registry.js';
+import { ConnectionRegistry, type Connection } from './connection-registry.js';
 import { PersonEventsStore } from './person-events.store.js';
 
 type RefusalCode = 'sessao_invalida' | 'origem_invalida';
@@ -76,36 +76,47 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
 
   /** Primeira conexão da aba: `pronto` com o ponto de partida. Reconexão: reposição em ordem, com os eventos ao vivo guardados até o fim. */
   private async start(connection: Connection, lastEvent: string | undefined) {
-    const { socket, personId } = connection;
-    let reference: string | null;
-    if (lastEvent === undefined) {
-      reference = await this.store.currentId(personId);
-    } else {
-      const result = await this.store.readSince(personId, lastEvent);
-      if (result.status === 'lost') {
-        connection.buffer = null;
-        if (socket.connected) socket.emit(SERVER_MESSAGES.lost, {});
-        return;
-      }
-      reference = lastEvent;
-      if (!socket.connected) return;
-      for (const event of result.events) {
-        socket.emit(SERVER_MESSAGES.event, event);
-        reference = event.id;
-      }
-    }
-    if (!socket.connected) return;
+    if (lastEvent === undefined) await this.startFresh(connection);
+    else await this.resume(connection, lastEvent);
+  }
 
+  private async startFresh(connection: Connection) {
+    const { socket, personId } = connection;
+    const startingPoint = await this.store.currentId(personId);
+    if (!socket.connected) return;
+    socket.emit(SERVER_MESSAGES.ready, { ultimo_evento: startingPoint });
+    this.release(connection, socket, startingPoint);
+  }
+
+  private async resume(connection: Connection, lastEvent: string) {
+    const { socket, personId } = connection;
+    const result = await this.store.readSince(personId, lastEvent);
+    if (!socket.connected) return;
+    if (result.status === 'lost') {
+      connection.buffer = null;
+      socket.emit(SERVER_MESSAGES.lost, {});
+      return;
+    }
+    let reference: string | null = lastEvent;
+    for (const event of result.events) {
+      socket.emit(SERVER_MESSAGES.event, event);
+      reference = event.id;
+    }
+    reference = this.release(connection, socket, reference);
+    socket.emit(SERVER_MESSAGES.ready, { ultimo_evento: reference });
+  }
+
+  /** Libera os eventos ao vivo guardados durante a reposição, só os posteriores a `reference`; devolve o último entregue. */
+  private release(connection: Connection, socket: Socket, reference: string | null) {
     const held = connection.buffer ?? [];
     connection.buffer = null;
-    if (lastEvent === undefined) socket.emit(SERVER_MESSAGES.ready, { ultimo_evento: reference });
     for (const event of held) {
-      if (reference === null || isAfter(event.id, reference)) {
+      if (reference === null || isNewerEventId(event.id, reference)) {
         socket.emit(SERVER_MESSAGES.event, event);
         reference = event.id;
       }
     }
-    if (lastEvent !== undefined) socket.emit(SERVER_MESSAGES.ready, { ultimo_evento: reference });
+    return reference;
   }
 
   /** A cada intervalo, uma consulta só pelas sessões das conexões abertas; fecha as que não valem mais. A conferência não renova a sessão. */

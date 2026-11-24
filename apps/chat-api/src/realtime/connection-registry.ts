@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type ChatEvent, SERVER_MESSAGES, compareEventIds, parseEventId } from 'chat-events';
+import { type ChatEvent, SERVER_MESSAGES } from 'chat-events';
 import type { Socket } from 'socket.io';
 
 /** Uma conexão aberta de uma aba. Com `buffer`, a reposição está em curso: os eventos ao vivo esperam nele. */
@@ -8,14 +8,6 @@ export interface Connection {
   personId: string;
   sessionId: string;
   buffer: ChatEvent[] | null;
-}
-
-/** Se `event` vem depois de `reference` na ordem da pessoa; identificadores de outra época não se comparam e valem como novos. */
-export function isAfter(event: string, reference: string): boolean {
-  const a = parseEventId(event);
-  const b = parseEventId(reference);
-  if (!a || !b || a.epoch !== b.epoch) return true;
-  return compareEventIds(a, b) > 0;
 }
 
 /** As conexões abertas, por pessoa. Uma instância só da API (HLD, seção 6.2), então a memória basta. */

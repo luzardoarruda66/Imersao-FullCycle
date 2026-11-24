@@ -1,4 +1,4 @@
-import { type ChatEvent, SERVER_MESSAGES, compareEventIds, parseEventId } from "chat-events";
+import { type ChatEvent, SERVER_MESSAGES, isNewerEventId } from "chat-events";
 
 /** Marca de "sem ponto de partida": o servidor responde `perdido` a ela, e a aba recarrega. */
 const NO_STARTING_POINT = "indisponivel";
@@ -78,17 +78,10 @@ export class RealtimeClient {
   }
 
   private receive(event: ChatEvent) {
-    if (this.alreadySeen(event.id)) return;
+    // Repetido: da mesma época e não posterior ao último confirmado.
+    if (this.lastEventId && !isNewerEventId(event.id, this.lastEventId)) return;
     this.lastEventId = event.id;
     for (const listener of this.listeners.get(event.tipo) ?? []) listener(event);
-  }
-
-  /** Repetido: da mesma época e não posterior ao último confirmado. Outra época vale como novo. */
-  private alreadySeen(id: string) {
-    const last = this.lastEventId && parseEventId(this.lastEventId);
-    const incoming = parseEventId(id);
-    if (!last || !incoming || last.epoch !== incoming.epoch) return false;
-    return compareEventIds(incoming, last) <= 0;
   }
 
   private giveUp(reload: boolean) {

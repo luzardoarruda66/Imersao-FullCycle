@@ -76,7 +76,7 @@ describe("Sidebar", () => {
     const [header, row] = screen.getAllByRole("button", { name: "Nova conversa" });
     await user.click(row!);
     expect(screen.getByRole("dialog", { name: "Nova conversa" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Buscar por nome ou @usuário" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Buscar por nome ou @usuário" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await user.click(header!);
     expect(screen.getByRole("dialog", { name: "Nova conversa" })).toBeInTheDocument();

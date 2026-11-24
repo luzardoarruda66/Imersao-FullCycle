@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 import { openDirectAction } from "@/app/actions/conversations";
@@ -7,6 +7,13 @@ import { PeopleSearchDialog } from "./people-search-dialog";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/app/actions/conversations", () => ({ openDirectAction: vi.fn() }));
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: React.ComponentProps<"a"> & { href: string }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 const action = vi.mocked(openDirectAction);
 const fetchMock = vi.fn();
 
@@ -30,14 +37,17 @@ function open() {
     </SWRConfig>,
   );
 }
-const field = () => screen.getByRole("combobox", { name: "Buscar por nome ou @usuário" });
+const field = () => screen.getByRole("searchbox", { name: "Buscar por nome ou @usuário" });
+const list = () => screen.getByRole("list", { name: "Pessoas" });
+const row = (name: RegExp) => within(list()).getByRole("button", { name });
+
 /** O texto que um leitor de tela lê: sem o que é `aria-hidden` (as iniciais do avatar). */
 const readable = (el: Element) => {
   const copy = el.cloneNode(true) as Element;
   copy.querySelectorAll("[aria-hidden]").forEach((node) => node.remove());
   return copy.textContent;
 };
-const options = () => screen.getAllByRole("option").map(readable);
+const rows = () => within(list()).getAllByRole("button").map(readable);
 
 describe("PeopleSearchDialog", () => {
   beforeEach(() => {
@@ -53,25 +63,18 @@ describe("PeopleSearchDialog", () => {
     open();
     expect(screen.getByRole("dialog", { name: "Nova conversa" })).toBeInTheDocument();
     expect(field()).toHaveFocus();
-    expect(await screen.findByRole("option", { name: /Alfredo Luiz/ })).toHaveTextContent("@alfredo.luiz");
-    expect(options()).toEqual(["Alfredo Luiz@alfredo.luiz", "Leonan Luppi@leonan.luppi"]);
+    expect(await screen.findByRole("list", { name: "Pessoas" })).toBeInTheDocument();
+    expect(rows()).toEqual(["Alfredo Luiz@alfredo.luiz", "Leonan Luppi@leonan.luppi"]);
     expect(urlOf(fetchMock.mock.calls[0]!)).toBe("/api/pessoas?busca=");
-  });
-
-  it("não deixa nenhum resultado ativo enquanto a busca está vazia", async () => {
-    fetchMock.mockResolvedValue(reply([ALFREDO, LEONAN]));
-    open();
-    await screen.findAllByRole("option");
-    expect(screen.queryAllByRole("option", { selected: true })).toHaveLength(0);
   });
 
   it("busca ao digitar, com o termo na URL", async () => {
     fetchMock.mockImplementation(async (url: string) => (url.endsWith("busca=lu") ? reply([ALFREDO, LUIZ]) : reply([ALFREDO, LEONAN, LUIZ])));
     const user = userEvent.setup();
     open();
-    await screen.findAllByRole("option");
+    await screen.findByRole("list", { name: "Pessoas" });
     await user.type(field(), "lu");
-    await waitFor(() => expect(options()).toEqual(["Alfredo Luiz@alfredo.luiz", "Luiz Carlos@luiz.carlos"]));
+    await waitFor(() => expect(rows()).toEqual(["Alfredo Luiz@alfredo.luiz", "Luiz Carlos@luiz.carlos"]));
     expect(fetchMock.mock.calls.map(urlOf)).toContain("/api/pessoas?busca=lu");
   });
 
@@ -95,24 +98,24 @@ describe("PeopleSearchDialog", () => {
     await user.type(field(), "l");
     await user.type(field(), "u");
     second.resolve(reply([LUIZ]));
-    await waitFor(() => expect(options()).toEqual(["Luiz Carlos@luiz.carlos"]));
+    await waitFor(() => expect(rows()).toEqual(["Luiz Carlos@luiz.carlos"]));
     first.resolve(reply([ALFREDO, LEONAN, LUIZ]));
     await new Promise((r) => setTimeout(r, 20));
-    expect(options()).toEqual(["Luiz Carlos@luiz.carlos"]);
+    expect(rows()).toEqual(["Luiz Carlos@luiz.carlos"]);
   });
 
   it("mostra o carregando enquanto a busca não responde", async () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     open();
     expect(await screen.findByRole("status")).toHaveTextContent("Buscando pessoas…");
-    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Pessoas" })).not.toBeInTheDocument();
   });
 
   it("diz que ninguém foi encontrado, com o termo digitado", async () => {
     fetchMock.mockImplementation(async (url: string) => (url.endsWith("busca=zzz") ? reply([]) : reply([ALFREDO])));
     const user = userEvent.setup();
     open();
-    await screen.findAllByRole("option");
+    await screen.findByRole("list", { name: "Pessoas" });
     await user.type(field(), "zzz");
     expect(await screen.findByRole("heading", { name: "Ninguém encontrado" })).toBeInTheDocument();
     expect(screen.getByText("Nenhum membro com “zzz” no nome ou no @usuário.")).toBeInTheDocument();
@@ -137,7 +140,7 @@ describe("PeopleSearchDialog", () => {
     expect(field()).toHaveValue("lu");
     failing = false;
     await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
-    expect(await screen.findByRole("option", { name: /Luiz Carlos/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Luiz Carlos/ })).toBeInTheDocument();
     expect(field()).toHaveValue("lu");
   });
 
@@ -153,46 +156,82 @@ describe("PeopleSearchDialog", () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
+  it("oferece Ver perfil em cada resultado, com o endereço do Perfil pelo id", async () => {
+    fetchMock.mockResolvedValue(reply([ALFREDO, LEONAN]));
+    open();
+    await screen.findByRole("list", { name: "Pessoas" });
+    expect(screen.getByRole("link", { name: "Ver perfil de Alfredo Luiz" })).toHaveAttribute("href", `/pessoas/${ALFREDO.id}`);
+    expect(screen.getByRole("link", { name: "Ver perfil de Leonan Luppi" })).toHaveAttribute("href", `/pessoas/${LEONAN.id}`);
+  });
+
   it("abre a conversa direta com o resultado escolhido por clique", async () => {
     fetchMock.mockResolvedValue(reply([ALFREDO, LEONAN]));
     action.mockResolvedValue({ status: "idle" });
     const user = userEvent.setup();
     open();
-    await user.click(await screen.findByRole("option", { name: /Leonan Luppi/ }));
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.click(row(/Leonan Luppi/));
     await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
     expect(Object.fromEntries(action.mock.calls[0]![1])).toEqual({ membroId: LEONAN.id });
   });
 
-  it("navega pelos resultados e escolhe só pelo teclado", async () => {
+  it("com um termo, o Enter no campo abre o primeiro resultado", async () => {
+    fetchMock.mockImplementation(async (url: string) => (url.endsWith("busca=lu") ? reply([LUIZ, ALFREDO]) : reply([])));
+    action.mockResolvedValue({ status: "idle" });
+    const user = userEvent.setup();
+    open();
+    await user.type(field(), "lu");
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(Object.fromEntries(action.mock.calls[0]![1])).toEqual({ membroId: LUIZ.id });
+  });
+
+  it("com a busca vazia, o Enter no campo não abre nada", async () => {
+    fetchMock.mockResolvedValue(reply([ALFREDO, LEONAN]));
+    const user = userEvent.setup();
+    open();
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.keyboard("{Enter}");
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("navega pelos resultados com as setas, volta ao campo e escolhe só pelo teclado", async () => {
     fetchMock.mockImplementation(async (url: string) => (url.endsWith("busca=lu") ? reply([ALFREDO, LEONAN, LUIZ]) : reply([])));
     action.mockResolvedValue({ status: "idle" });
     const user = userEvent.setup();
     open();
     await user.type(field(), "lu");
-    await screen.findAllByRole("option");
-    // Com um termo, o primeiro resultado já está ativo.
-    expect(screen.getByRole("option", { name: /Alfredo Luiz/ })).toHaveAttribute("aria-selected", "true");
+    await screen.findByRole("list", { name: "Pessoas" });
+
+    await user.keyboard("{ArrowDown}");
+    expect(row(/Alfredo Luiz/)).toHaveFocus();
     await user.keyboard("{ArrowDown}{ArrowDown}");
-    const active = screen.getByRole("option", { name: /Luiz Carlos/ });
-    expect(active).toHaveAttribute("aria-selected", "true");
-    expect(field()).toHaveAttribute("aria-activedescendant", active.id);
+    expect(row(/Luiz Carlos/)).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(row(/Luiz Carlos/)).toHaveFocus();
     await user.keyboard("{ArrowUp}");
-    expect(screen.getByRole("option", { name: /Leonan Luppi/ })).toHaveAttribute("aria-selected", "true");
-    await user.keyboard("{Enter}");
+    expect(row(/Leonan Luppi/)).toHaveFocus();
+    await user.keyboard("{ArrowUp}{ArrowUp}");
+    expect(field()).toHaveFocus();
+
+    await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
     expect(Object.fromEntries(action.mock.calls[0]![1])).toEqual({ membroId: LEONAN.id });
   });
 
-  it("com a busca vazia, a seta para baixo ativa o primeiro resultado e o Enter não abre nada antes disso", async () => {
+  it("alcança o Ver perfil pelo Tab, depois do botão da mesma linha, sem abrir a conversa", async () => {
     fetchMock.mockResolvedValue(reply([ALFREDO, LEONAN]));
-    action.mockResolvedValue({ status: "idle" });
     const user = userEvent.setup();
     open();
-    await screen.findAllByRole("option");
-    await user.keyboard("{Enter}");
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.tab();
+    expect(row(/Alfredo Luiz/)).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Ver perfil de Alfredo Luiz" })).toHaveFocus();
+    await user.tab();
+    expect(row(/Leonan Luppi/)).toHaveFocus();
     expect(action).not.toHaveBeenCalled();
-    await user.keyboard("{ArrowDown}");
-    expect(screen.getByRole("option", { name: /Alfredo Luiz/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("mostra Abrindo a conversa e desabilita os outros resultados enquanto abre", async () => {
@@ -201,10 +240,10 @@ describe("PeopleSearchDialog", () => {
     action.mockReturnValue(opening.promise);
     const user = userEvent.setup();
     open();
-    await user.click(await screen.findByRole("option", { name: /Alfredo Luiz/ }));
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.click(row(/Alfredo Luiz/));
     expect(await screen.findByRole("status")).toHaveTextContent("Abrindo a conversa…");
-    expect(screen.getByRole("option", { name: /Leonan Luppi/ })).toHaveAttribute("aria-disabled", "true");
-    await user.click(screen.getByRole("option", { name: /Leonan Luppi/ }));
+    expect(row(/Leonan Luppi/)).toBeDisabled();
     expect(action).toHaveBeenCalledTimes(1);
     // Libera a ação: uma transição que nunca termina seguraria as dos testes seguintes.
     opening.resolve({ status: "idle" });
@@ -216,9 +255,10 @@ describe("PeopleSearchDialog", () => {
     action.mockResolvedValue({ status: "error", message: "Não foi possível abrir a conversa. Tente de novo." });
     const user = userEvent.setup();
     open();
-    await user.click(await screen.findByRole("option", { name: /Alfredo Luiz/ }));
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.click(row(/Alfredo Luiz/));
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível abrir a conversa");
     expect(screen.getByRole("dialog", { name: "Nova conversa" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Alfredo Luiz/ })).not.toHaveAttribute("aria-disabled", "true");
+    expect(row(/Alfredo Luiz/)).toBeEnabled();
   });
 });

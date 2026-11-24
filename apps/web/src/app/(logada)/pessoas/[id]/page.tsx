@@ -28,5 +28,5 @@ async function Person({ params }: { params: PageProps<"/pessoas/[id]">["params"]
   // Id que não existe ou que não é um UUID: a API responde igual, e a tela também.
   if (person.kind === "error") return <PersonNotFound />;
 
-  return <PersonProfile person={person.data} />;
+  return <PersonProfile person={person.data} isSelf={person.data.id === session.member.id} />;
 }

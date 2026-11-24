@@ -153,7 +153,7 @@ conversa ativa na lateral. Nenhum componente novo: tudo é instância de `Person
 - **Falha ao abrir:** texto de erro em linha dentro do diálogo, o mesmo padrão da F1-02, com o
   diálogo aberto.
 - **Perfil:** página com cabeçalho "Perfil" e, no corpo, `UserAvatar` `xl`, nome, `@usuário`, e os
-  campos Cargo, Telefone e Status, cada um com rótulo e valor, ou "Não informado" em `fg-subtle`. O
+  campos Cargo, Telefone e Status, cada um com rótulo e valor, ou "Não informado" em `fg-muted` (o `fg-subtle` não chega ao contraste de 4,5:1). O
   botão `Button` secondary `md` "Enviar mensagem" aparece nos Perfis de outras pessoas e some no
   próprio Perfil. Sem presença, sem e-mail e sem hora local (diferente do `ProfilePanel`, que fica
   para a F1-07). O estado "Não encontrado" usa `EmptyState` com o botão "Voltar ao início".

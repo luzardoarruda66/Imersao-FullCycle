@@ -1,19 +1,20 @@
 "use client";
 
 import { CircleAlert, Search } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useId, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import useSWR from "swr";
 import { openDirectAction, type OpenDirectState } from "@/app/actions/conversations";
 import { Avatar } from "@/app/components/ui/avatar";
-import { Button } from "@/app/components/ui/button";
+import { Button, buttonVariants } from "@/app/components/ui/button";
 import { Dialog, DialogContent } from "@/app/components/ui/dialog";
 import { EmptyState } from "@/app/components/ui/empty-state";
 import { Input } from "@/app/components/ui/field";
 import { Skeleton } from "@/app/components/ui/skeleton";
 import { Spinner } from "@/app/components/ui/spinner";
 import { cn } from "@/app/utils/cn";
-import type { PersonSummary } from "@/lib/people";
+import { profilePath, type PersonSummary } from "@/lib/people";
 
 const IDLE: OpenDirectState = { status: "idle" };
 
@@ -47,13 +48,13 @@ function SearchSkeleton() {
 
 function SearchBody() {
   const router = useRouter();
-  const listId = useId();
   const [term, setTerm] = useState("");
-  // Só a escolha por seta fica aqui; sem ela, vale o padrão (o primeiro resultado, quando há um termo).
-  const [picked, setPicked] = useState<number | null>(null);
+  const [inField, setInField] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(openDirectAction, IDLE);
   const [, startTransition] = useTransition();
+  const field = useRef<HTMLInputElement>(null);
+  const rows = useRef<(HTMLButtonElement | null)[]>([]);
 
   const { data, error, isLoading, mutate } = useSWR(`/api/pessoas?busca=${encodeURIComponent(term)}`, fetchPeople, {
     revalidateOnFocus: false,
@@ -66,8 +67,6 @@ function SearchBody() {
 
   const results = data ?? [];
   const searching = term.trim() !== "";
-  const active = results.length === 0 ? -1 : Math.min(picked ?? (searching ? 0 : -1), results.length - 1);
-  const optionId = (index: number) => `${listId}-${index}`;
 
   const open = (person: PersonSummary) => {
     if (pending) return;
@@ -77,17 +76,28 @@ function SearchBody() {
     startTransition(() => formAction(form));
   };
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  // O foco passa de verdade entre o campo e os resultados (e não por `aria-activedescendant`): cada linha tem um botão
+  // e um link, e uma lista de opções não pode ter link dentro.
+  const onFieldKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (results.length === 0) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setPicked(Math.min(active + 1, results.length - 1));
+      rows.current[0]?.focus();
+    } else if (event.key === "Enter" && searching) {
+      // Com um termo, o primeiro resultado é o que o Enter abre (a linha vem destacada).
+      event.preventDefault();
+      open(results[0]!);
+    }
+  };
+
+  const onRowKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      rows.current[Math.min(index + 1, results.length - 1)]?.focus();
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setPicked(Math.max(active - 1, 0));
-    } else if (event.key === "Enter" && active >= 0) {
-      event.preventDefault();
-      open(results[active]!);
+      if (index === 0) field.current?.focus();
+      else rows.current[index - 1]?.focus();
     }
   };
 
@@ -97,22 +107,18 @@ function SearchBody() {
       <div className="relative">
         <Search size={16} aria-hidden className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-muted" />
         <Input
-          role="combobox"
+          ref={field}
+          role="searchbox"
           aria-label="Buscar por nome ou @usuário"
-          aria-autocomplete="list"
-          aria-expanded={listing}
-          aria-controls={listing ? listId : undefined}
-          aria-activedescendant={active >= 0 ? optionId(active) : undefined}
           placeholder="Buscar por nome ou @usuário"
           autoComplete="off"
           data-autofocus
           className="pl-9"
           value={term}
-          onChange={(event) => {
-            setTerm(event.target.value);
-            setPicked(null);
-          }}
-          onKeyDown={onKeyDown}
+          onChange={(event) => setTerm(event.target.value)}
+          onFocus={() => setInField(true)}
+          onBlur={() => setInField(false)}
+          onKeyDown={onFieldKeyDown}
         />
       </div>
 
@@ -138,32 +144,40 @@ function SearchBody() {
           }
         />
       ) : (
-        <ul id={listId} role="listbox" aria-label="Pessoas" className="flex max-h-96 flex-col overflow-y-auto">
+        <ul aria-label="Pessoas" className="flex max-h-96 flex-col overflow-y-auto">
           {results.map((person, index) => {
-            const isActive = index === active;
             const isChoosing = pending && choosing === person.id;
             const disabled = pending && !isChoosing;
             return (
-              <li key={person.id} role="presentation" className="flex items-center gap-2">
-                <div
-                  id={optionId(index)}
-                  role="option"
-                  aria-selected={isActive}
-                  aria-disabled={disabled || undefined}
+              <li
+                key={person.id}
+                // Com um termo, a primeira linha vem destacada, inteira, enquanto o foco está no campo: é a que o Enter abre.
+                className={cn("flex items-center gap-2 rounded-item", index === 0 && searching && inField && "bg-surface-subtle")}
+              >
+                <button
+                  type="button"
+                  ref={(node) => {
+                    rows.current[index] = node;
+                  }}
+                  disabled={disabled}
                   onClick={() => open(person)}
-                  className={cn(
-                    "flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-item px-2 py-2 transition-colors duration-100 hover:bg-surface-subtle",
-                    isActive && "bg-surface-subtle",
-                    disabled && "pointer-events-none opacity-50",
-                  )}
+                  onKeyDown={(event) => onRowKeyDown(event, index)}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-item px-2 py-2 text-left transition-colors duration-100 hover:bg-surface-subtle focus-visible:bg-surface-subtle disabled:pointer-events-none disabled:opacity-50"
                 >
                   <Avatar name={person.nome} />
-                  <div className="flex min-w-0 flex-col">
+                  <span className="flex min-w-0 flex-col">
                     <span className="truncate text-body font-bold text-fg">{person.nome}</span>
                     <span className="truncate text-small text-fg-muted">@{person.usuario}</span>
-                  </div>
+                  </span>
                   {isChoosing && <Spinner className="ml-auto text-fg-muted" />}
-                </div>
+                </button>
+                <Link
+                  href={profilePath(person.id)}
+                  aria-label={`Ver perfil de ${person.nome}`}
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "shrink-0", disabled && "pointer-events-none opacity-50")}
+                >
+                  Ver perfil
+                </Link>
               </li>
             );
           })}
@@ -176,7 +190,7 @@ function SearchBody() {
         </p>
       )}
       {state.status === "error" && !pending && (
-        <p role="alert" className="px-2 text-small text-danger-fg">
+        <p role="alert" className="text-small text-danger-fg px-2">
           {state.message}
         </p>
       )}

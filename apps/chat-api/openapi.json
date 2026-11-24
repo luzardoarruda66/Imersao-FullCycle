@@ -376,6 +376,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "antes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
           }
         ],
         "responses": {
@@ -383,7 +393,7 @@
             "description": ""
           }
         },
-        "summary": "As 50 mensagens mais recentes, da mais antiga para a mais nova",
+        "summary": "Uma página de 50 mensagens, da mais antiga para a mais nova; `antes` pagina para trás",
         "tags": [
           "conversas"
         ]
@@ -426,6 +436,50 @@
           }
         },
         "summary": "Enviar uma mensagem",
+        "tags": [
+          "conversas"
+        ]
+      }
+    },
+    "/v1/conversas/{id}/leitura": {
+      "post": {
+        "operationId": "ConversationsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mensagem_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "mensagem_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Registrar a leitura da conversa até uma mensagem; devolve as contagens",
         "tags": [
           "conversas"
         ]

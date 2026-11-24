@@ -35,7 +35,7 @@ describe('Conversas em tempo real (e2e Socket.IO)', () => {
       const res = await as(t, ana.sid).post(`/v1/conversas/${id}/mensagens`, { texto: 'Bom dia' });
       for (const conn of [anaTab1, anaTab2, biaTab, caioTab]) {
         await conn.waitFor(() => eventsOf(conn, 'mensagem_criada').length === 1);
-        expect(eventsOf(conn, 'mensagem_criada')[0]!.dados).toEqual({ conversa_id: id, mensagem: res.body });
+        expect(eventsOf(conn, 'mensagem_criada')[0]!.dados).toMatchObject({ conversa_id: id, mensagem: res.body });
       }
     });
 
@@ -134,7 +134,7 @@ describe('Conversas em tempo real (e2e Socket.IO)', () => {
       await back.waitFor(() => back.ready.length === 1);
       const messages = eventsOf(back, 'mensagem_criada');
       expect(messages).toHaveLength(1);
-      expect(messages[0]!.dados).toEqual({ conversa_id: id, mensagem: res.body });
+      expect(messages[0]!.dados).toEqual({ conversa_id: id, mensagem: res.body, contagens: { nao_lidas: 1, mencoes: 0 } });
     });
   });
 });

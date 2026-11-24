@@ -2,6 +2,8 @@ import { DataSource, type DataSourceOptions } from 'typeorm';
 import { AuthBase1790000000000 } from '../../migrations/1790000000000-AuthBase.js';
 import { Conversations1790000000001 } from '../../migrations/1790000000001-Conversations.js';
 import { Username1790000000002 } from '../../migrations/1790000000002-Username.js';
+import { ReadState1790000000003 } from '../../migrations/1790000000003-ReadState.js';
+import { ConversationReadStateEntity } from './entities/conversation-read-state.entity.js';
 import { ConversationParticipantEntity } from './entities/conversation-participant.entity.js';
 import { ConversationEntity } from './entities/conversation.entity.js';
 import { LoginAttemptEntity } from './entities/login-attempt.entity.js';
@@ -21,8 +23,9 @@ export function buildDataSourceOptions(url: string | undefined): DataSourceOptio
       ConversationEntity,
       ConversationParticipantEntity,
       MessageEntity,
+      ConversationReadStateEntity,
     ],
-    migrations: [AuthBase1790000000000, Conversations1790000000001, Username1790000000002],
+    migrations: [AuthBase1790000000000, Conversations1790000000001, Username1790000000002, ReadState1790000000003],
     synchronize: false,
     // Ids em UUID v7 gerados na aplicação; datas em UTC.
     extra: { options: '-c timezone=UTC' },

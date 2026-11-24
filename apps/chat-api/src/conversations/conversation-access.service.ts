@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConversationParticipantEntity } from '../database/entities/conversation-participant.entity.js';
 import { ConversationEntity } from '../database/entities/conversation.entity.js';
+import { PersonEntity } from '../database/entities/person.entity.js';
 import { AppError } from '../errors/app-error.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,6 +21,7 @@ export class ConversationAccessService {
     @InjectRepository(ConversationEntity) private readonly conversations: Repository<ConversationEntity>,
     @InjectRepository(ConversationParticipantEntity)
     private readonly participants: Repository<ConversationParticipantEntity>,
+    @InjectRepository(PersonEntity) private readonly people: Repository<PersonEntity>,
   ) {}
 
   async requireAccess(conversationId: string, personId: string): Promise<ConversationEntity> {
@@ -30,5 +32,13 @@ export class ConversationAccessService {
     const participates = await this.participants.existsBy({ conversationId, personId });
     if (!participates) throw conversationNotFound();
     return conversation;
+  }
+
+  /** Quem participa da conversa: todos os membros no canal público (a F1-02 não grava os participantes dele), os participantes no resto. */
+  async participantIds(conversation: Pick<ConversationEntity, 'id' | 'type'>): Promise<string[]> {
+    if (conversation.type === 'canal_publico') {
+      return (await this.people.find({ select: { id: true } })).map((row) => row.id);
+    }
+    return (await this.participants.find({ where: { conversationId: conversation.id } })).map((row) => row.personId);
   }
 }

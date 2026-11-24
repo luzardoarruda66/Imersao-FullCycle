@@ -11,6 +11,7 @@ import { ConversationsController } from './conversations.controller.js';
 import { ConversationsService } from './conversations.service.js';
 import { MembersController } from './members.controller.js';
 import { MessagesService } from './messages.service.js';
+import { TypingService } from './typing.service.js';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { MessagesService } from './messages.service.js';
     RealtimeModule,
   ],
   controllers: [ConversationsController, MembersController],
-  providers: [ConversationAccessService, ConversationEvents, ConversationsService, MessagesService],
+  providers: [ConversationAccessService, ConversationEvents, ConversationsService, MessagesService, TypingService],
   exports: [ConversationAccessService],
 })
 export class ConversationsModule {}

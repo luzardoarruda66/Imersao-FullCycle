@@ -12,6 +12,15 @@ const at = (id: string, date: Date, autor = "Ana", texto = id): ChatMessage => (
 });
 
 describe("MessageList", () => {
+  it("destaca só as menções que a API reconheceu, como texto da mensagem", () => {
+    const message = { ...at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "Oi @bia, escreva para caio@empresa.com ou @ninguem"), mencoes: [{ id: "p2", usuario: "bia" }] };
+    render(<MessageList messages={[message]} intro={null} />);
+    const chip = screen.getByText("@bia");
+    expect(chip).toHaveClass("bg-mention-bg", "text-mention-fg");
+    expect(screen.getByText(/escreva para caio@empresa.com ou @ninguem/)).not.toHaveClass("bg-mention-bg");
+    expect(screen.getByRole("log").textContent).toContain("Oi @bia, escreva para caio@empresa.com ou @ninguem");
+  });
+
   it("mostra autor, horário e texto de cada mensagem", () => {
     render(<MessageList messages={[at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "Bom dia")]} intro={null} />);
     expect(screen.getByText("Ana")).toBeInTheDocument();

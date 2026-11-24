@@ -3,6 +3,7 @@
 import type { ChatMessage } from "chat-events";
 import { ArrowDown } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
+import { MessageText } from "@/app/components/conversation/message-text";
 import { Avatar } from "@/app/components/ui/avatar";
 import { Button } from "@/app/components/ui/button";
 import { Spinner } from "@/app/components/ui/spinner";
@@ -26,7 +27,9 @@ function MessageItem({ message, mounted }: { message: ChatMessage; mounted: bool
             {mounted ? formatTime(new Date(message.criada_em)) : ""}
           </time>
         </div>
-        <p className="text-body break-words whitespace-pre-wrap text-fg">{message.texto}</p>
+        <p className="text-body break-words whitespace-pre-wrap text-fg">
+          <MessageText text={message.texto} mentions={message.mencoes} />
+        </p>
       </div>
     </li>
   );

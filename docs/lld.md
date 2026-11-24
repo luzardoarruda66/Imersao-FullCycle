@@ -14,7 +14,7 @@
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
-| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `pronto` e `perdido` existem; `mensagem_criada`, `contagem_atualizada` e `digitando`, planejados na F1-04; os outros, com as funcionalidades que os emitem) |
+| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `mensagem_criada`, `conversa_visivel`, `pronto` e `perdido` existem; `contagem_atualizada` e `digitando`, planejados na F1-04; os outros, com as funcionalidades que os emitem) |
 | Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
@@ -174,7 +174,9 @@ novas tentativas e idempotência").
   seção 12).
 - **Participação em canal privado e conversa direta:** um serviço só, no módulo de conversas, a
   confere, e toda rota que lê ou escreve numa conversa o chama. O WebSocket entrega por pessoa e
-  não o usa: quem publica o evento o chama para escolher os destinatários. Quem não participa recebe a mesma resposta de uma conversa que não existe, para que a
+  não o usa: quem publica o evento o chama para escolher os destinatários. No módulo de conversas, quem faz isso é o
+  `ConversationEvents`: o canal público alcança todos os membros, e o canal privado e a conversa direta, só os
+  participantes. Quem não participa recebe a mesma resposta de uma conversa que não existe, para que a
   resposta não revele que o canal privado existe. Canal público não exige convite.
 - **Credenciais de bot e de serviço:** a forma (um segredo por processo ou por agente) está a
   definir. Toda ação de bot leva o identificador de pedido
@@ -279,8 +281,9 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 | Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único. @usuário (`username`) obrigatório e único, gravado em minúsculas; cargo, telefone e status opcionais, lidos pela F1-03 e escritos pela F1-07. A busca ignora acentos e maiúsculas com a extensão `unaccent` do Postgres, que a migração cria. As contas que já existiam receberam o @usuário na migração, derivado da parte do e-mail antes do `@`, com sufixo numérico em colisão | existe |
 | Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | existe |
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
-| Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes. Nome do canal único sem diferenciar maiúsculas; um par de membros só tem uma conversa direta | a detalhar |
-| Chat | Mensagens (autor pessoa ou bot, citação, marca "dados de negócio") | a detalhar |
+| Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes (só no canal privado e na conversa direta: o canal público não os grava). Nome do canal único sem diferenciar maiúsculas, valendo entre público e privado; um par de membros só tem uma conversa direta, pela chave `menorId:maiorId` | existe |
+| Chat | Mensagens (texto, autor pessoa, conversa) | existe |
+| Chat | Mensagens: autor bot, citação e marca "dados de negócio" | a detalhar |
 | Chat | Menções | a detalhar |
 | Chat | Estado de leitura, por pessoa e conversa: posição de leitura (a última mensagem lida), contador de não lidas e contador de menções, nunca negativos. Regras em "Concorrência e idempotência" | planejada |
 | Chat | Notificações | a detalhar |
@@ -332,7 +335,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 **Índice das rotas**
 
 O índice por domínio (BFF; API do chat, para o BFF e para os bots; Serviço de agentes) e a lista
-de eventos do WebSocket estão a definir. O único comportamento já decidido:
+de eventos do WebSocket estão a definir. O que já está decidido:
 
 | Método e caminho | Situação | Comportamento |
 | --- | --- | --- |
@@ -341,6 +344,15 @@ de eventos do WebSocket estão a definir. O único comportamento já decidido:
 | `DELETE /v1/sessoes/atual` (API do chat) | existe | Sair: apaga a sessão do cookie e devolve o `Set-Cookie` que o expira |
 | `GET /v1/eu` (API do chat) | existe | O membro da sessão. Sem sessão válida: `sessao_invalida` (401), código de toda rota com sessão |
 | `PUT /v1/eu/senha` (API do chat) | existe | Trocar a senha: "Sessão e login". Erros: `senha_atual_incorreta` (422), `senha_fraca` (422, com `details.regras_faltando`) |
+| `GET /v1/conversas` (API do chat) | existe | As conversas do membro, separadas por tipo (`canais_publicos`, `canais_privados`, `diretas`), em ordem alfabética sem diferenciar maiúsculas; na conversa direta, o nome é o da outra pessoa |
+| `POST /v1/conversas/canais` (API do chat) | existe | Cria canal (nome aparado, de 1 a `tamanho do nome do canal`; `tipo` `publico` ou `privado`). O canal privado começa com o criador como participante. Erros: `nome_canal_em_uso` (409), `dados_invalidos` (400) |
+| `POST /v1/conversas/diretas` (API do chat) | existe | Abre a conversa direta com um membro ou devolve a que já existe (200 nos dois casos). Erros: `conversa_direta_consigo_mesmo` (422), `nao_encontrado` (404) |
+| `GET /v1/conversas/:id` (API do chat) | existe | A conversa; o canal privado traz `participantes`. Id que não é UUID, que não existe, ou de canal privado ou conversa direta de que a pessoa não participa: `conversa_inexistente` (404), igual nos três casos ("Segurança") |
+| `POST /v1/conversas/:id/participantes` (API do chat) | existe | Convida membros (`membros_ids`) para canal privado; quem já participa fica como está. Erros: `conversa_nao_aceita_convite` (422, canal público e conversa direta), `dados_invalidos` (400, inclusive membro que não existe), `conversa_inexistente` (404) |
+| `GET` e `POST /v1/conversas/:id/mensagens` (API do chat) | existe | Lê as `mensagens devolvidas por leitura` mais recentes, em ordem cronológica; envia (texto aparado, até `tamanho da mensagem`). Erros: `conversa_inexistente` (404), `dados_invalidos` (400) |
+| `GET /v1/membros` (API do chat) | existe | Os membros do workspace, só `id` e `nome` (o perfil é da F1-03) |
+| Evento `mensagem_criada` (WebSocket) | existe | Publicado depois do commit da mensagem, para quem vê a conversa ("Segurança"); leva o id da conversa e a mensagem completa |
+| Evento `conversa_visivel` (WebSocket) | existe | Publicado quando a pessoa passa a ver uma conversa: canal público novo (todos os membros), canal privado novo (o criador), conversa direta nova (os dois) e convite (só quem foi convidado de fato). Leva só o id da conversa; o `web` relê a lateral |
 | `GET /v1/pessoas` (API do chat) | planejada | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
 | `GET /v1/pessoas/:id` (API do chat) | planejada | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
 | `GET /v1/conversas/:id/mensagens` (API do chat) | planejada | Ganha `antes` e `tem_mais` (convenção de paginação, acima) |
@@ -412,18 +424,21 @@ definir.
 | Rota | Acesso | Lê | Ações | Situação |
 | --- | --- | --- | --- | --- |
 | `/entrar` | Público | — | Entrar com e-mail e senha | existe |
-| `/` (casca: Rail e menu do usuário) | Sessão | O membro da sessão | Trocar a própria senha, num diálogo; sair | existe |
-| A definir | Sessão | Histórico da conversa | Enviar, editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
-| A definir (lateral) | Sessão | Conversas, com não lidas e menções (selo de `99+` acima de 99; sem selo em zero; menções zeradas até a F1-05) | Abrir conversa | planejada |
+| `/` (casca: Rail, lateral com as conversas e menu do usuário) | Sessão | O membro da sessão e a lista de conversas | Abrir conversa; criar canal; abrir conversa direta; trocar a própria senha, num diálogo; sair | existe |
+| `/conversas/[id]` | Sessão | A conversa e as `mensagens devolvidas por leitura` mais recentes | Enviar mensagem; ver os participantes e convidar, no canal privado | existe |
+| A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
+| A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral (selo de `99+` acima de 99; sem selo em zero; menções zeradas até a F1-05) | — | planejada |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
 | `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | planejada |
 | Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | planejada |
-| A definir | Sessão | — | Criar canal; convidar para canal privado | a detalhar |
 | A definir | Sessão; conectar e desconectar só para administrador | Agentes e estado de conexão | Conectar e desconectar agente | a detalhar |
 
 **Leituras e tempo real.** A página carrega pelos Server Components. No cliente, o SWR guarda as
 leituras que o tempo real altera (mensagens, não lidas, notificações), e cada evento do WebSocket
-atualiza esse cache direto, sem nova requisição.
+atualiza esse cache direto, sem nova requisição. Na F1-02, o painel da conversa aberta guarda as mensagens
+em estado do próprio componente, sem SWR: junta a leitura do servidor, a mensagem que a pessoa enviou e o evento
+`mensagem_criada` sem repetir (pelo identificador), e o `conversa_visivel` faz o `web` reler a lateral. O SWR
+entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
 
 - **Mensagens.** `mensagem_criada` acrescenta ao fim da conversa carregada, ignorando um id já
   presente (a resposta do envio e a reposição podem trazer a mesma), e grava as contagens na lista.
@@ -495,8 +510,10 @@ atualiza esse cache direto, sem nova requisição.
 | Tempo para o "digitando" sumir | 5 segundos sem novo evento (spec da F1-04) | `web` | A definir |
 | Intervalo de envio do "digitando" | No máximo um a cada 3 segundos por conversa, no campo de mensagem (spec da F1-04) | `web` | A definir |
 | Intervalo mínimo entre "digitando" | 1 segundo por pessoa e conversa; o repetido antes disso é ignorado (spec da F1-04) | API do chat | A definir |
-| Tamanho do nome do canal | 1 a 80 caracteres | API do chat | A definir |
-| Tamanho da mensagem | Até 4.000 caracteres | API do chat | A definir |
+| Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | Constante `MESSAGES_PER_READ`, no mesmo arquivo |
+| Tamanho do nome do canal | 1 a 80 caracteres | API do chat e `web` | Constante `CHANNEL_NAME_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` (projetos independentes, [ADR 0017](adr/0017-projetos-pnpm-independentes.md)) |
+| Tamanho da mensagem | Até 4.000 caracteres | API do chat e `web` | Constante `MESSAGE_TEXT_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` |
+| Convidados por pedido | Até 100 | API do chat | Constante `INVITE_MAX`, no mesmo arquivo |
 | Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | Constantes `USERNAME_MIN_LENGTH` e `USERNAME_MAX_LENGTH`, no mesmo arquivo; função `isValidUsername`, em `apps/chat-api/src/accounts/username-rule.ts` |
 | Resultados da busca de pessoas | No máximo 20 | API do chat | A definir |
 
@@ -566,6 +583,8 @@ As decisões que mudam o desenho estão no HLD, seção 10.
       do schema das variáveis.
 - [ ] Parser da conferência de somente leitura (pglast ou sqlglot).
 - [ ] Biblioteca de log estruturado (pino e structlog, ou o logger de cada framework).
+- [ ] Se o SWR entra na F1-04 ou se o estado do próprio componente basta para as leituras que o tempo
+      real altera; a F1-02 não o usa ("Cliente", "Leituras e tempo real").
 - [ ] Porquê das escolhas sem motivo registrado: App Router, SWR, FastAPI próprio, uv; ADRs 0017,
       0018, 0019, 0021 e 0022.
 

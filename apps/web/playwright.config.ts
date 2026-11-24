@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Roda no serviço `e2e` do Compose (LLD, seção 10), contra o `web` e a `chat-api` de pé.
 // O Chromium enxerga `localhost` como o contêiner `web`: o cookie `Secure` da sessão só vale em `localhost` ou HTTPS.
+// O WebSocket do tempo real (`NEXT_PUBLIC_CHAT_WS_URL`, `localhost:3001`) vai direto à `chat-api`, com o mesmo cookie.
 export default defineConfig({
   testDir: "./e2e",
   workers: 1,
@@ -9,7 +10,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:3000",
-    launchOptions: { args: ["--host-resolver-rules=MAP localhost web"] },
+    launchOptions: { args: ["--host-resolver-rules=MAP localhost:3001 chat-api:3001, MAP localhost web"] },
     trace: "retain-on-failure",
   },
   projects: [

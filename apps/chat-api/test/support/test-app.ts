@@ -49,7 +49,9 @@ export interface ConnectOptions {
 /** O que o cliente recebeu, na ordem, e como esperar por mais. */
 export interface ClientConnection {
   socket: Socket;
-  events: { id: string; tipo: string; dados: { mensagem: string }; momento: string }[];
+  // Os dados variam por tipo de evento; o teste que os lê conhece o tipo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  events: { id: string; tipo: string; dados: any; momento: string }[];
   ready: { ultimo_evento: string | null }[];
   lost: number;
   /** O motivo do fechamento pelo servidor, quando houve. */

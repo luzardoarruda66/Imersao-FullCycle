@@ -3,9 +3,23 @@ import { z } from 'zod';
 /** Nomes das mensagens do servidor para o cliente (LLD, seção 2, "Eventos por pessoa (Redis)"). */
 export const SERVER_MESSAGES = { event: 'evento', ready: 'pronto', lost: 'perdido' } as const;
 
+/** Uma mensagem de conversa como a API do chat a devolve e o evento `mensagem_criada` a carrega. */
+export const chatMessageSchema = z.object({
+  id: z.string().min(1),
+  conversa_id: z.string().min(1),
+  autor: z.object({ id: z.string().min(1), nome: z.string() }),
+  texto: z.string(),
+  criada_em: z.string().min(1),
+});
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
 /** Dados de cada tipo de evento de domínio. Os tipos novos entram com as funcionalidades que os emitem. */
 export const eventDataSchemas = {
   diagnostico: z.object({ mensagem: z.string() }),
+  /** Uma mensagem nova numa conversa que a pessoa vê. */
+  mensagem_criada: z.object({ conversa_id: z.string().min(1), mensagem: chatMessageSchema }),
+  /** A pessoa passou a ver uma conversa (canal novo, conversa direta aberta ou convite recebido): a lista muda. */
+  conversa_visivel: z.object({ conversa_id: z.string().min(1) }),
 } as const;
 
 export type EventType = keyof typeof eventDataSchemas;
@@ -15,12 +29,16 @@ const envelopeBase = { id: z.string().min(1), momento: z.string().min(1) };
 /** Evento de domínio com o envelope comum: identificador, tipo, dados e momento. */
 export const chatEventSchema = z.discriminatedUnion('tipo', [
   z.object({ ...envelopeBase, tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
+  z.object({ ...envelopeBase, tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
+  z.object({ ...envelopeBase, tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
 ]);
 export type ChatEvent = z.infer<typeof chatEventSchema>;
 
 /** O evento que quem publica entrega: sem identificador nem momento, que o servidor atribui. */
 export const chatEventDraftSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
+  z.object({ tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
+  z.object({ tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
 ]);
 export type ChatEventDraft = z.infer<typeof chatEventDraftSchema>;
 

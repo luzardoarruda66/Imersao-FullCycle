@@ -246,7 +246,10 @@ body {
   }
 }
 
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/* Na camada `base`, para que `focus-visible:outline-none` dos campos (que trocam o contorno pelo anel) a sobrescreva. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }

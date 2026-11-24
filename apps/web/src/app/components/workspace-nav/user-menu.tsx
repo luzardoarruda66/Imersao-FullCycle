@@ -23,11 +23,11 @@ export function UserMenu({ name }: { name: string }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={`Menu do usuário, ${name}`}
-          className="rounded-item transition-opacity duration-100 hover:opacity-80"
-        >
+        {/* O nome vem do conteúdo (texto só para leitor de tela), e não de `aria-label`: com as iniciais visíveis no botão,
+            o `aria-label` as deixaria fora do nome acessível (regra `label-content-name-mismatch` do axe). */}
+        <DropdownMenuTrigger className="rounded-item transition-opacity duration-100 hover:opacity-80">
           <Avatar name={name} />
+          <span className="sr-only">Menu do usuário, {name}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" className="w-60">
           <DropdownMenuLabel className="flex items-center gap-3 py-1">

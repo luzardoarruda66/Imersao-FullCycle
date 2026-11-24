@@ -7,6 +7,21 @@ describe('chat-events', () => {
     expect(chatEventSchema.parse(event)).toEqual(event);
   });
 
+  it('valida os eventos de mensagem criada e de conversa visível', () => {
+    const mensagem = {
+      id: 'm1',
+      conversa_id: 'c1',
+      autor: { id: 'p1', nome: 'Ana' },
+      texto: 'oi',
+      criada_em: '2026-11-24T00:00:00.000Z',
+    };
+    const base = { id: 'a-1-0', momento: '2026-11-24T00:00:00.000Z' };
+    expect(chatEventSchema.parse({ ...base, tipo: 'mensagem_criada', dados: { conversa_id: 'c1', mensagem } }).tipo).toBe('mensagem_criada');
+    expect(chatEventSchema.parse({ ...base, tipo: 'conversa_visivel', dados: { conversa_id: 'c1' } }).tipo).toBe('conversa_visivel');
+    expect(chatEventDraftSchema.safeParse({ tipo: 'mensagem_criada', dados: { conversa_id: 'c1' } }).success).toBe(false);
+    expect(chatEventDraftSchema.safeParse({ tipo: 'conversa_visivel', dados: {} }).success).toBe(false);
+  });
+
   it('recusa tipo desconhecido e dados fora do formato', () => {
     expect(chatEventDraftSchema.safeParse({ tipo: 'outro', dados: {} }).success).toBe(false);
     expect(chatEventDraftSchema.safeParse({ tipo: 'diagnostico', dados: { mensagem: 1 } }).success).toBe(false);

@@ -9,14 +9,19 @@ export function badgeText(count: number): string | null {
   return count > BADGE_CEILING ? `${BADGE_CEILING}+` : String(count);
 }
 
-/** O nome acessível do item da lista: o nome da conversa com as contagens, para o leitor de tela dizer o que o selo é. */
-export function badgeLabel(name: string, unread: number, mentions: number): string {
-  const parts = [name];
+/** O que se acrescenta ao nome da conversa para o leitor de tela dizer as contagens: ", 3 não lidas, 2 menções". */
+export function badgeSuffix(unread: number, mentions: number): string {
+  const parts: string[] = [];
   const unreadText = badgeText(unread);
   if (unreadText) parts.push(`${unreadText} ${unread === 1 ? "não lida" : "não lidas"}`);
   const mentionText = badgeText(mentions);
   if (mentionText) parts.push(`${mentionText} ${mentions === 1 ? "menção" : "menções"}`);
-  return parts.join(", ");
+  return parts.map((part) => `, ${part}`).join("");
+}
+
+/** O nome acessível do item da lista: o nome da conversa com as contagens. */
+export function badgeLabel(name: string, unread: number, mentions: number): string {
+  return name + badgeSuffix(unread, mentions);
 }
 
 /** Grava as contagens de uma conversa na lista; uma conversa que a lista não tem não cria linha, e contagem igual devolve a mesma lista. */

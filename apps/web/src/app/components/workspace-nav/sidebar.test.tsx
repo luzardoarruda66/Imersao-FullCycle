@@ -1,5 +1,6 @@
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { mutate } from "swr";
 import type { ConversationList } from "@/lib/conversations";
 import { setReadingConversation } from "@/lib/open-conversation";
 import { Sidebar } from "./sidebar";
@@ -41,7 +42,9 @@ const LIST: ConversationList = {
 };
 
 describe("Sidebar", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // O cache do SWR é global: cada teste começa sem o que o anterior deixou.
+    await mutate(() => true, undefined, { revalidate: false });
     pathname = "/";
     refresh.mockReset();
     for (const key of Object.keys(handlers)) delete handlers[key];

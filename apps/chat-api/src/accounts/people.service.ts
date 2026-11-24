@@ -4,10 +4,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v7 as uuidv7 } from 'uuid';
 import { PersonEntity } from '../database/entities/person.entity.js';
+import { normalizeUsername } from './username-rule.js';
 
 export const normalizeEmail = (email: string) => email.trim().normalize('NFC').toLowerCase();
 
 export class EmailAlreadyRegisteredError extends Error {}
+export class UsernameAlreadyTakenError extends Error {}
+
+const USERNAME_CONSTRAINT = 'UQ_people_username';
+const isUniqueViolation = (error: { code?: string }) => error.code === '23505';
+const isUsernameConflict = (error: { code?: string; constraint?: string }) =>
+  isUniqueViolation(error) && error.constraint === USERNAME_CONSTRAINT;
 export class PersonNotFoundError extends Error {}
 
 @Injectable()
@@ -25,28 +32,37 @@ export class PeopleService {
     return this.people.findOneBy({ id });
   }
 
-  async create(input: { email: string; name: string; password: string }) {
+  async create(input: { email: string; username: string; name: string; password: string }) {
     const email = normalizeEmail(input.email);
     const person = this.people.create({
       id: uuidv7(),
       email,
+      username: normalizeUsername(input.username),
       name: input.name.trim(),
       passwordHash: await this.hasher.hash(input.password),
     });
-    // O índice único é quem decide a corrida entre dois cadastros do mesmo e-mail.
-    const result = await this.people.insert(person).then(
-      () => true,
-      (error: { code?: string }) => {
-        if (error.code === '23505') return false;
-        throw error;
-      },
-    );
-    if (!result) throw new EmailAlreadyRegisteredError(email);
+    // O índice único é quem decide a corrida entre dois cadastros do mesmo e-mail ou do mesmo @usuário.
+    await this.people.insert(person).catch((error: { code?: string; constraint?: string }) => {
+      if (isUsernameConflict(error)) throw new UsernameAlreadyTakenError(person.username);
+      if (isUniqueViolation(error)) throw new EmailAlreadyRegisteredError(email);
+      throw error;
+    });
     return person;
   }
 
   async setPassword(id: string, password: string) {
     await this.people.update({ id }, { passwordHash: await this.hasher.hash(password), updatedAt: new Date() });
+  }
+
+  /** Troca o @usuário da conta; o índice único decide a corrida com outro cadastro ou outra troca. */
+  async setUsername(id: string, username: string) {
+    const normalized = normalizeUsername(username);
+    await this.people
+      .update({ id }, { username: normalized, updatedAt: new Date() })
+      .catch((error: { code?: string; constraint?: string }) => {
+        if (isUsernameConflict(error)) throw new UsernameAlreadyTakenError(normalized);
+        throw error;
+      });
   }
 
   async setFlags(id: string, flags: Partial<Pick<PersonEntity, 'isAdmin' | 'hasDataPermission'>>) {

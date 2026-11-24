@@ -17,8 +17,8 @@ describe('Tempo real (e2e Socket.IO)', () => {
   beforeEach(async () => {
     t = await createTestApp();
     diagnostics = t.app.get(DiagnosticsService);
-    anaId = (await t.people.create({ email: ANA, name: 'Ana', password: PASSWORD })).id;
-    biaId = (await t.people.create({ email: BIA, name: 'Bia', password: PASSWORD })).id;
+    anaId = (await t.createPerson({ email: ANA, name: 'Ana' })).id;
+    biaId = (await t.createPerson({ email: BIA, name: 'Bia' })).id;
   });
   afterEach(() => t.close());
 

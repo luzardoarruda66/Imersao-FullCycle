@@ -268,7 +268,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 
 | Banco | Entidade (HLD, seção 7) | Situação |
 | --- | --- | --- |
-| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único. **Alteração `planejada` (F1-03):** @usuário (`username`) obrigatório e único, gravado em minúsculas; cargo, telefone e status opcionais, lidos pela F1-03 e escritos pela F1-07. A busca ignora acentos e maiúsculas com a extensão `unaccent` do Postgres. As contas existentes recebem o @usuário na migração, derivado da parte do e-mail antes do `@`, com sufixo numérico se colidir | existe |
+| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único. @usuário (`username`) obrigatório e único, gravado em minúsculas; cargo, telefone e status opcionais, lidos pela F1-03 e escritos pela F1-07. A busca ignora acentos e maiúsculas com a extensão `unaccent` do Postgres, que a migração cria. As contas que já existiam receberam o @usuário na migração, derivado da parte do e-mail antes do `@`, com sufixo numérico em colisão | existe |
 | Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | existe |
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
 | Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes. Nome do canal único sem diferenciar maiúsculas; um par de membros só tem uma conversa direta | a detalhar |
@@ -358,14 +358,13 @@ Os números estão em "Valores e configuração".
 - **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
   `regra da senha`, e a recusa lista as regras que faltaram. Depois da troca, a sessão atual
   continua e as outras sessões da pessoa são apagadas.
-- **Operação.** O comando `contas` da API do chat cria a conta (e-mail e nome), redefine a senha,
-  encerra as sessões, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
+- **Operação.** O comando `contas` da API do chat cria a conta (e-mail, @usuário e nome), redefine a
+  senha, encerra as sessões, troca o @usuário, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
   geram uma senha aleatória que cumpre a `regra da senha` e a mostram uma vez só; não há troca
   obrigatória no primeiro acesso. Encerrar as sessões, ou redefinir a senha, apaga todas as
   sessões da pessoa.
-  **Alteração `planejada` (F1-03):** `criar` passa a receber e-mail, @usuário e nome, e o subcomando
-  `definir-usuario` troca o @usuário de uma conta. @usuário em uso ou fora do formato
-  (`formato do @usuário`) é recusado, com mensagem clara.
+  `criar` e `definir-usuario` recusam @usuário em uso ou fora do formato (`formato do @usuário`), com
+  mensagem clara. Trocar o @usuário não encerra as sessões da conta; só a operação o troca.
 
 ## 7. Processos de segundo plano
 
@@ -453,7 +452,7 @@ atualiza esse cache direto, sem nova requisição.
 | Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | A definir |
 | Tamanho do nome do canal | 1 a 80 caracteres | API do chat | A definir |
 | Tamanho da mensagem | Até 4.000 caracteres | API do chat | A definir |
-| Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | A definir |
+| Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | Constantes `USERNAME_MIN_LENGTH` e `USERNAME_MAX_LENGTH`, no mesmo arquivo; função `isValidUsername`, em `apps/chat-api/src/accounts/username-rule.ts` |
 | Resultados da busca de pessoas | No máximo 20 | API do chat | A definir |
 
 **Variáveis de ambiente**

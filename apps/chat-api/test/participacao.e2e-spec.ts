@@ -3,13 +3,13 @@ import { ConversationAccessService } from '../src/conversations/conversation-acc
 import { ConversationEntity, type ConversationType } from '../src/database/entities/conversation.entity.js';
 import { ConversationParticipantEntity } from '../src/database/entities/conversation-participant.entity.js';
 import { AppError } from '../src/errors/app-error.js';
-import { PASSWORD, createTestApp, type TestApp } from './support/test-app.js';
+import { createTestApp, type TestApp } from './support/test-app.js';
 
 describe('Serviço de participação (e2e)', () => {
   let t: TestApp;
   let access: ConversationAccessService;
 
-  const person = (email: string, name: string) => t.people.create({ email, name, password: PASSWORD });
+  const person = (email: string, name: string) => t.createPerson({ email, name });
 
   const conversation = async (type: ConversationType, participants: string[], name: string | null = null) => {
     const entity = t.dataSource.getRepository(ConversationEntity).create({

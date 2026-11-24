@@ -60,7 +60,8 @@ Snapshot do contrato: `docker compose exec chat-api pnpm openapi` regrava `opena
 Comando de contas da operação (LLD, seção 6.2, "Operação"), com o subcomando no lugar de `<...>`:
 
 ```
-docker compose exec chat-api pnpm contas criar <email> <nome>
+docker compose exec chat-api pnpm contas criar <email> <usuario> <nome>
+docker compose exec chat-api pnpm contas definir-usuario <email> <usuario>
 docker compose exec chat-api pnpm contas redefinir-senha <email>
 docker compose exec chat-api pnpm contas encerrar-sessoes <email>
 docker compose exec chat-api pnpm contas dar-admin <email>      # ou tirar-admin

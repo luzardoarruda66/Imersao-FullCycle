@@ -9,6 +9,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { PeopleService } from '../../src/accounts/people.service.js';
+import type { PersonEntity } from '../../src/database/entities/person.entity.js';
 import { Clock } from '../../src/clock.js';
 import { SESSION_COOKIE_NAME } from '../../src/config/values.js';
 
@@ -26,6 +27,8 @@ export interface TestApp {
   app: INestApplication;
   clock: TestClock;
   people: PeopleService;
+  /** Cria uma pessoa com @usuário: o informado ou, sem ele, a parte do e-mail antes do `@`. A senha padrão é `PASSWORD`. */
+  createPerson: (input: { email: string; name: string; password?: string; username?: string }) => Promise<PersonEntity>;
   dataSource: DataSource;
   http: () => ReturnType<typeof request>;
   redis: Redis;
@@ -133,6 +136,8 @@ export async function createTestApp(): Promise<TestApp> {
     app,
     clock,
     people: app.get(PeopleService),
+    createPerson: ({ email, name, password = PASSWORD, username = email.split('@')[0]! }) =>
+      app.get(PeopleService).create({ email, username, name, password }),
     dataSource,
     http: () => request(app.getHttpServer()),
     close: async () => {

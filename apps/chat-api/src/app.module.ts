@@ -16,6 +16,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_DURATION,
 } from './config/values.js';
+import { ConversationsModule } from './conversations/conversations.module.js';
 import { buildDataSourceOptions } from './database/data-source.js';
 import { AllExceptionsFilter } from './errors/all-exceptions.filter.js';
 import { LoginAttemptsModule } from './login-attempts/login-attempts.module.js';
@@ -51,6 +52,7 @@ import { RealtimeModule } from './realtime/realtime.module.js';
     AccountsModule,
     LoginAttemptsModule,
     AuthModule,
+    ConversationsModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

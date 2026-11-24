@@ -221,6 +221,10 @@
           "senha_fraca",
           "origem_invalida",
           "nao_encontrado",
+          "conversa_inexistente",
+          "nome_canal_em_uso",
+          "conversa_direta_consigo_mesmo",
+          "conversa_nao_aceita_convite",
           "erro_interno"
         ]
       },

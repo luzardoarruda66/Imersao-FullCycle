@@ -31,3 +31,5 @@ export const PEOPLE_SEARCH_LIMIT = 20;
 
 // Mensagens (LLD, seção 9, "Valores e configuração").
 export const QUOTE_EXCERPT_MAX = 140;
+/** Prazo para editar e apagar a própria mensagem: 4 horas depois do envio (PRD da F1-05). */
+export const EDIT_WINDOW_MS = 4 * 60 * 60 * 1000;

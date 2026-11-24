@@ -9,6 +9,32 @@ export function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): 
   );
 }
 
+/** O prazo para editar e apagar a própria mensagem: 4 horas depois do envio (PRD da F1-05). A API é quem recusa; aqui só se esconde a ação. */
+export const EDIT_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+/** O membro pode editar a mensagem: é o autor, ela não foi apagada e o prazo de 4 horas (inclusive) não passou. */
+export function canEdit(message: ChatMessage, memberId: string | undefined, now: number): boolean {
+  if (!memberId || message.autor.id !== memberId || message.apagada) return false;
+  return now - Date.parse(message.criada_em) <= EDIT_WINDOW_MS;
+}
+
+/**
+ * Aplica uma mensagem editada à lista: troca pelo id e atualiza o trecho das citações carregadas a ela. Mensagem que não
+ * está carregada, ou que chega mais velha que a já mostrada (eventos fora de ordem) ou depois de apagada, não muda a
+ * lista (devolve a mesma). Aplicar duas vezes a mesma edição dá o mesmo resultado.
+ */
+export function applyEdit(messages: ChatMessage[], edited: ChatMessage): ChatMessage[] {
+  const shown = messages.find((message) => message.id === edited.id);
+  if (!shown || shown.apagada) return messages;
+  if (shown.editada_em && edited.editada_em && Date.parse(edited.editada_em) < Date.parse(shown.editada_em)) return messages;
+  return messages.map((message) => {
+    if (message.id === edited.id) return edited;
+    const quote = message.citacao;
+    if (quote?.id === edited.id && !quote.apagada) return { ...message, citacao: { ...quote, trecho: excerptOf(edited.texto) } };
+    return message;
+  });
+}
+
 /** O tamanho do trecho de uma citação, em caracteres (LLD, "Valores e configuração"): é o mesmo da API. */
 export const QUOTE_EXCERPT_MAX = 140;
 

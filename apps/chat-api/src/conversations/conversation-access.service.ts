@@ -6,7 +6,7 @@ import { ConversationEntity } from '../database/entities/conversation.entity.js'
 import { PersonEntity } from '../database/entities/person.entity.js';
 import { AppError } from '../errors/app-error.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const conversationNotFound = () => new AppError('conversa_inexistente', 404, 'Conversa não encontrada.');
 

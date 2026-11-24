@@ -27,6 +27,7 @@ describe('Snapshot OpenAPI', () => {
       '/v1/conversas/{id}/mensagens',
       '/v1/conversas/{id}/mencionaveis',
       '/v1/conversas/{id}/leitura',
+      '/v1/conversas/{id}/mensagens/{mensagemId}',
       '/v1/membros',
       '/v1/pessoas',
       '/v1/pessoas/{id}',

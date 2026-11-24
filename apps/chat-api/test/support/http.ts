@@ -15,5 +15,6 @@ export function as(t: TestApp, sid: string | undefined) {
   return {
     get: (path: string) => withCookie(t.http().get(path)),
     post: (path: string, body?: unknown) => withCookie(t.http().post(path)).send(body as object),
+    patch: (path: string, body?: unknown) => withCookie(t.http().patch(path)).send(body as object),
   };
 }

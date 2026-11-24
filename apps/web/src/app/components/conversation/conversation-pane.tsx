@@ -3,11 +3,11 @@
 import type { ChatMessage } from "chat-events";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { markReadAction } from "@/app/actions/conversations";
+import { editMessageAction, markReadAction } from "@/app/actions/conversations";
 import { MessageComposer } from "@/app/components/conversation/message-composer";
 import { MessageList } from "@/app/components/conversation/message-list";
 import { TypingIndicator } from "@/app/components/conversation/typing-indicator";
-import { mergeMessages } from "@/lib/messages";
+import { applyEdit, mergeMessages } from "@/lib/messages";
 import { setReadingConversation } from "@/lib/open-conversation";
 import { getRealtimeClient } from "@/lib/realtime/realtime";
 import { fetchMessagePage, nextReadTarget } from "@/lib/reading";
@@ -53,6 +53,10 @@ export function ConversationPane({
   const [atBottom, setAtBottom] = useState(true);
   // A mensagem que a próxima vai citar.
   const [quote, setQuote] = useState<ChatMessage | null>(null);
+  // A mensagem em edição (uma por vez), se está salvando e o erro da última tentativa.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPending, setEditPending] = useState(false);
+  const [editError, setEditError] = useState<string | undefined>();
   const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState === "visible");
   // O servidor releu a conversa (atualização da página, reconexão): junta o que veio com o que já estava na tela.
   if (initialMessages !== seen) {
@@ -69,12 +73,17 @@ export function ConversationPane({
       // Quem enviou a mensagem não está mais digitando.
       setTypers((current) => removeTyper(current, conversationId, event.dados.mensagem.autor.id));
     });
+    const offEdited = client.subscribe("mensagem_editada", (event) => {
+      if (event.dados.conversa_id !== conversationId) return;
+      setMessages((current) => applyEdit(current, event.dados.mensagem));
+    });
     const offTyping = client.subscribe("digitando", (event) => {
       if (event.dados.conversa_id !== conversationId) return;
       setTypers((current) => addTyper(current, conversationId, event.dados.pessoa, Date.now()));
     });
     return () => {
       offMessages();
+      offEdited();
       offTyping();
     };
   }, [conversationId]);
@@ -197,6 +206,30 @@ export function ConversationPane({
     [conversationId, flushScroll],
   );
 
+  const startEdit = (message: ChatMessage) => {
+    setEditingId(message.id);
+    setEditError(undefined);
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditError(undefined);
+  };
+  const saveEdit = async (messageId: string, text: string) => {
+    setEditPending(true);
+    setEditError(undefined);
+    try {
+      const result = await editMessageAction(conversationId, messageId, text);
+      if (result.status === "edited") {
+        setMessages((current) => applyEdit(current, result.message));
+        setEditingId(null);
+      } else {
+        setEditError(result.message);
+      }
+    } finally {
+      setEditPending(false);
+    }
+  };
+
   const lastTypingSent = useRef(0);
   const sendTyping = () => {
     const now = Date.now();
@@ -217,6 +250,8 @@ export function ConversationPane({
         onLoadOlder={() => void loadOlder()}
         onAtBottomChange={setAtBottom}
         onQuote={setQuote}
+        onEdit={startEdit}
+        editing={editingId ? { messageId: editingId, pending: editPending, error: editError, onSave: (text) => void saveEdit(editingId, text), onCancel: cancelEdit } : undefined}
         onGoToMessage={(id) => void goToMessage(id)}
       />
       <TypingIndicator text={typingText(typers, conversationId)} />

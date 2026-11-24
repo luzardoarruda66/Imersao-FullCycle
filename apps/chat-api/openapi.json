@@ -523,6 +523,58 @@
         ]
       }
     },
+    "/v1/conversas/{id}/mensagens/{mensagemId}": {
+      "patch": {
+        "operationId": "ConversationsController_editMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mensagemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "texto": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "texto"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Editar o texto da própria mensagem, até 4 horas depois do envio",
+        "tags": [
+          "conversas"
+        ]
+      }
+    },
     "/v1/membros": {
       "get": {
         "operationId": "MembersController_list",
@@ -615,6 +667,10 @@
           "conversa_direta_consigo_mesmo",
           "conversa_nao_aceita_convite",
           "pessoa_inexistente",
+          "mensagem_inexistente",
+          "mensagem_de_outra_pessoa",
+          "prazo_encerrado",
+          "mensagem_apagada",
           "erro_interno"
         ]
       },

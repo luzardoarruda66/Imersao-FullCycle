@@ -2,7 +2,7 @@ import type { ChatEvent, ChatMessage } from "chat-events";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
-import { markReadAction, sendMessageAction } from "@/app/actions/conversations";
+import { editMessageAction, markReadAction, sendMessageAction } from "@/app/actions/conversations";
 import { fetchMessagePage } from "@/lib/reading";
 import { ConversationPane } from "./conversation-pane";
 
@@ -20,7 +20,7 @@ vi.mock("@/lib/realtime/realtime", () => ({
     sendTyping,
   }),
 }));
-vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
+vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), editMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
 vi.mock("@/lib/reading", async (original) => ({ ...(await original<typeof import("@/lib/reading")>()), fetchMessagePage: vi.fn() }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -59,6 +59,103 @@ const pane = (initial: ChatMessage[], hasMore = false) => (
 
 const setVisibility = (state: "visible" | "hidden") =>
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+
+describe("ConversationPane: edição", () => {
+  const editAction = vi.mocked(editMessageAction);
+  const mine = (n: number, over: Partial<ChatMessage> = {}): ChatMessage => ({ ...message(`m${n}`, `texto ${n}`, "c1", `2026-11-24T10:0${n}:00.000Z`), ...over });
+  const editedOf = (m: ChatMessage, texto: string): ChatMessage => ({ ...m, texto, editada_em: "2026-11-24T10:20:00.000Z" });
+  const editablePane = (initial: ChatMessage[]) => (
+    <ConversationPane conversationId="c1" placeholder="Mensagem para #geral" initialMessages={initial} initialHasMore={false} intro={null} currentMemberId="p1" />
+  );
+  const editEvent = (m: ChatMessage, conversa = "c1") =>
+    ({ id: `e-edit-${m.id}`, tipo: "mensagem_editada", momento: "agora", dados: { conversa_id: conversa, mensagem: m } }) as ChatEvent;
+
+  beforeEach(() => {
+    for (const key of Object.keys(handlers)) delete handlers[key];
+    editAction.mockReset();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-24T10:30:00.000Z"));
+    setVisibility("visible");
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("Editar abre o editor no lugar da mensagem; salvar troca o texto, marca (editada) e fecha o editor", async () => {
+    const original = mine(1);
+    editAction.mockResolvedValue({ status: "edited", message: editedOf(original, "texto corrigido") });
+    const user = userEvent.setup();
+    render(editablePane([original]));
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    const field = screen.getByRole("textbox", { name: "Editar mensagem" });
+    await user.clear(field);
+    await user.type(field, "texto corrigido{Enter}");
+    expect(editAction).toHaveBeenCalledWith("c1", "m1", "texto corrigido");
+    expect(await screen.findByText(/texto corrigido/)).toBeInTheDocument();
+    expect(screen.getByText("(editada)")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Editar mensagem" })).not.toBeInTheDocument();
+  });
+
+  it("Esc cancela a edição sem chamar a API, e só uma mensagem fica em edição por vez", async () => {
+    const user = userEvent.setup();
+    render(editablePane([mine(1), mine(2)]));
+    await user.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    expect(screen.getAllByRole("textbox", { name: "Editar mensagem" })).toHaveLength(1);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox", { name: "Editar mensagem" })).not.toBeInTheDocument();
+    expect(editAction).not.toHaveBeenCalled();
+  });
+
+  it("o erro da API aparece no editor, que continua aberto com o texto", async () => {
+    editAction.mockResolvedValue({ status: "error", message: "O prazo de 4 horas para editar esta mensagem acabou." });
+    const user = userEvent.setup();
+    render(editablePane([mine(1)]));
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    await user.type(screen.getByRole("textbox", { name: "Editar mensagem" }), "!{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent("O prazo de 4 horas");
+    expect(screen.getByRole("textbox", { name: "Editar mensagem" })).toHaveValue("texto 1!");
+  });
+
+  it("a edição de outra pessoa chega pelo tempo real e troca o texto, sem recarregar", () => {
+    const original = mine(1, { autor: { id: "p2", nome: "Bia", usuario: "bia" } });
+    render(editablePane([original]));
+    act(() => handlers.mensagem_editada!(editEvent(editedOf(original, "texto da Bia, corrigido"))));
+    expect(screen.getByText(/texto da Bia, corrigido/)).toBeInTheDocument();
+    expect(screen.getByText("(editada)")).toBeInTheDocument();
+  });
+
+  it("a mesma edição entregue duas vezes (resposta e evento) não duplica nem estraga a tela", async () => {
+    const original = mine(1);
+    const edited = editedOf(original, "texto corrigido");
+    editAction.mockResolvedValue({ status: "edited", message: edited });
+    const user = userEvent.setup();
+    render(editablePane([original, mine(2)]));
+    await user.click(screen.getAllByRole("button", { name: "Editar" })[0]!);
+    await user.type(screen.getByRole("textbox", { name: "Editar mensagem" }), "{Enter}");
+    await user.type(screen.getByRole("textbox", { name: "Editar mensagem" }), "x{Enter}");
+    act(() => handlers.mensagem_editada!(editEvent(edited)));
+    act(() => handlers.mensagem_editada!(editEvent(edited)));
+    expect(screen.getAllByText(/texto corrigido/)).toHaveLength(1);
+    expect(screen.getByText("texto 2")).toBeInTheDocument();
+    expect(screen.getAllByText("(editada)")).toHaveLength(1);
+  });
+
+  it("evento de outra conversa, ou de uma mensagem que não está carregada, não faz nada", () => {
+    render(editablePane([mine(1)]));
+    act(() => handlers.mensagem_editada!(editEvent(editedOf(mine(1), "outra conversa"), "c2")));
+    act(() => handlers.mensagem_editada!(editEvent(editedOf(mine(9), "não carregada"))));
+    expect(screen.getByText("texto 1")).toBeInTheDocument();
+    expect(screen.queryByText(/outra conversa|não carregada/)).not.toBeInTheDocument();
+    expect(screen.queryByText("(editada)")).not.toBeInTheDocument();
+  });
+
+  it("a citação carregada a uma mensagem que foi editada passa a mostrar o texto novo", () => {
+    const original = mine(1, { autor: { id: "p2", nome: "Bia", usuario: "bia" } });
+    const reply = mine(2, { citacao: { id: "m1", autor: original.autor, trecho: "texto 1", apagada: false } });
+    render(editablePane([original, reply]));
+    act(() => handlers.mensagem_editada!(editEvent(editedOf(original, "texto 1, revisado"))));
+    expect(screen.getByRole("button", { name: /Ir para a mensagem de Bia/ })).toHaveTextContent("texto 1, revisado");
+  });
+});
 
 describe("ConversationPane: citação", () => {
   const scrollIntoView = vi.fn();
@@ -215,7 +312,7 @@ describe("ConversationPane", () => {
     it("cancela as inscrições ao sair da conversa", () => {
       const { unmount } = render(pane([]));
       unmount();
-      expect(unsubscribe).toHaveBeenCalledTimes(2);
+      expect(unsubscribe).toHaveBeenCalledTimes(3);
     });
   });
 

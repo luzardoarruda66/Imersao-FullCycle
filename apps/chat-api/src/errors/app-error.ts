@@ -15,6 +15,10 @@ export const ERROR_CODES = [
   'conversa_direta_consigo_mesmo',
   'conversa_nao_aceita_convite',
   'pessoa_inexistente',
+  'mensagem_inexistente',
+  'mensagem_de_outra_pessoa',
+  'prazo_encerrado',
+  'mensagem_apagada',
   'erro_interno',
 ] as const;
 

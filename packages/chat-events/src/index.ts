@@ -57,6 +57,8 @@ export const eventDataSchemas = {
     /** As contagens da pessoa que recebe o evento, já com a soma desta mensagem. */
     contagens: readCountsSchema,
   }),
+  /** Uma mensagem foi editada: a mensagem completa, com o texto novo, as menções e `editada_em`. */
+  mensagem_editada: z.object({ conversa_id: z.string().min(1), mensagem: chatMessageSchema }),
   /** A pessoa leu a conversa (em outra aba): as contagens novas dela. */
   contagem_atualizada: z.object({ conversa_id: z.string().min(1) }).extend(readCountsSchema.shape),
   /** Alguém digita na conversa. Só ao vivo: não entra na reposição depois de uma queda. */
@@ -78,6 +80,7 @@ const envelopeBase = { id: z.string().min(1), momento: z.string().min(1) };
 export const chatEventSchema = z.discriminatedUnion('tipo', [
   z.object({ ...envelopeBase, tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
   z.object({ ...envelopeBase, tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
+  z.object({ ...envelopeBase, tipo: z.literal('mensagem_editada'), dados: eventDataSchemas.mensagem_editada }),
   z.object({ ...envelopeBase, tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
   z.object({ ...envelopeBase, tipo: z.literal('contagem_atualizada'), dados: eventDataSchemas.contagem_atualizada }),
   z.object({ ...envelopeBase, tipo: z.literal('digitando'), dados: eventDataSchemas.digitando }),
@@ -88,6 +91,7 @@ export type ChatEvent = z.infer<typeof chatEventSchema>;
 export const chatEventDraftSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('diagnostico'), dados: eventDataSchemas.diagnostico }),
   z.object({ tipo: z.literal('mensagem_criada'), dados: eventDataSchemas.mensagem_criada }),
+  z.object({ tipo: z.literal('mensagem_editada'), dados: eventDataSchemas.mensagem_editada }),
   z.object({ tipo: z.literal('conversa_visivel'), dados: eventDataSchemas.conversa_visivel }),
   z.object({ tipo: z.literal('contagem_atualizada'), dados: eventDataSchemas.contagem_atualizada }),
   z.object({ tipo: z.literal('digitando'), dados: eventDataSchemas.digitando }),

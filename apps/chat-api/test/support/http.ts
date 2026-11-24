@@ -2,7 +2,8 @@ import { PASSWORD, sidFrom, type TestApp } from './test-app.js';
 
 /** Cria a conta, entra e devolve o cookie e o id da pessoa. */
 export async function signUp(t: TestApp, email: string, name: string, ip = '10.0.0.1') {
-  const person = await t.people.create({ email, name, password: PASSWORD });
+  // O @usuário vem da parte local do e-mail (`ana@empresa.com` -> `ana`), que já cumpre o formato (LLD, "Valores e configuração").
+  const person = await t.people.create({ email, username: email.split('@')[0]!, name, password: PASSWORD });
   const res = await t.http().post('/v1/sessoes').set('X-Forwarded-For', ip).send({ email, senha: PASSWORD });
   return { id: person.id, name, sid: sidFrom(res)! };
 }

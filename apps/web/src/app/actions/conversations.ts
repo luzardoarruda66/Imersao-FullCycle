@@ -13,7 +13,9 @@ import {
   sendMessageSchema,
   type FieldErrors,
 } from "@/lib/schemas";
+import { z } from "zod";
 import { callChatApi, clearSessionCookie } from "@/server/chat-api";
+import { markConversationRead } from "@/server/conversations";
 
 export type CreateChannelState =
   | { status: "idle" }
@@ -95,6 +97,20 @@ export async function inviteAction(conversationId: string, _previous: InviteStat
   if (result.kind === "invalid-session") return endSession();
   const fallback = "Não foi possível convidar as pessoas. Tente de novo.";
   return { status: "error", message: result.kind === "error" ? conversationErrorMessage(result.code, fallback) : fallback };
+}
+
+const readSchema = z.object({ conversationId: z.string().min(1), messageId: z.string().min(1) });
+
+/**
+ * Registra a leitura da conversa até a mensagem (Server Action, ADR 0024). Falha em silêncio para a tela: a leitura
+ * é refeita na próxima mensagem ou ao abrir a conversa; a sessão inválida manda para "Entrar".
+ */
+export async function markReadAction(conversationId: string, messageId: string): Promise<{ ok: boolean }> {
+  const parsed = readSchema.safeParse({ conversationId, messageId });
+  if (!parsed.success) return { ok: false };
+  const result = await markConversationRead(parsed.data.conversationId, parsed.data.messageId);
+  if (result.kind === "invalid-session") return endSession();
+  return { ok: result.kind === "ok" };
 }
 
 export async function sendMessageAction(

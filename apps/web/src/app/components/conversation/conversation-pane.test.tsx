@@ -1,89 +1,252 @@
 import type { ChatEvent, ChatMessage } from "chat-events";
-import { render, screen, act } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { markReadAction } from "@/app/actions/conversations";
+import { fetchMessagePage } from "@/lib/reading";
 import { ConversationPane } from "./conversation-pane";
 
-type Listener = (event: Extract<ChatEvent, { tipo: "mensagem_criada" }>) => void;
-let listener: Listener | undefined;
+type Handler = (event: ChatEvent) => void;
+const handlers: Record<string, Handler> = {};
 const unsubscribe = vi.fn();
+const sendTyping = vi.fn();
 
 vi.mock("@/lib/realtime/realtime", () => ({
   getRealtimeClient: () => ({
-    subscribe: (_type: string, callback: Listener) => {
-      listener = callback;
+    subscribe: (type: string, callback: Handler) => {
+      handlers[type] = callback;
       return unsubscribe;
     },
+    sendTyping,
   }),
 }));
-vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn() }));
+vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
+vi.mock("@/lib/reading", async (original) => ({ ...(await original<typeof import("@/lib/reading")>()), fetchMessagePage: vi.fn() }));
 
-const message = (id: string, texto: string, conversa = "c1", criadaEm = "2026-11-24T10:00:00.000Z"): ChatMessage => ({
+const read = vi.mocked(markReadAction);
+const fetchPage = vi.mocked(fetchMessagePage);
+
+const message = (id: string, texto: string, conversa = "c1", criadaEm = "2026-11-24T10:00:00.000Z", autorId = "p1"): ChatMessage => ({
   id,
   conversa_id: conversa,
-  autor: { id: "p1", nome: "Ana" },
+  autor: { id: autorId, nome: "Ana", usuario: "ana" },
   texto,
   criada_em: criadaEm,
 });
 
-const event = (m: ChatMessage) =>
-  ({ id: `e-${m.id}`, tipo: "mensagem_criada", momento: m.criada_em, dados: { conversa_id: m.conversa_id, mensagem: m } }) as Extract<
-    ChatEvent,
-    { tipo: "mensagem_criada" }
-  >;
+const created = (m: ChatMessage) =>
+  ({
+    id: `e-${m.id}`,
+    tipo: "mensagem_criada",
+    momento: m.criada_em,
+    dados: { conversa_id: m.conversa_id, mensagem: m, contagens: { nao_lidas: 1, mencoes: 0 } },
+  }) as ChatEvent;
 
-const pane = (initial: ChatMessage[]) => (
-  <ConversationPane conversationId="c1" placeholder="Mensagem para #geral" initialMessages={initial} intro={<p>Escreva a primeira mensagem</p>} />
+const typing = (usuario: string, id: string, conversa = "c1") =>
+  ({ id: `ao_vivo-1-${id}`, tipo: "digitando", momento: "agora", dados: { conversa_id: conversa, pessoa: { id, usuario } } }) as ChatEvent;
+
+const pane = (initial: ChatMessage[], hasMore = false) => (
+  <ConversationPane
+    conversationId="c1"
+    placeholder="Mensagem para #geral"
+    initialMessages={initial}
+    initialHasMore={hasMore}
+    intro={<p>Escreva a primeira mensagem</p>}
+  />
 );
+
+const setVisibility = (state: "visible" | "hidden") =>
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
 
 describe("ConversationPane", () => {
   beforeEach(() => {
-    listener = undefined;
+    for (const key of Object.keys(handlers)) delete handlers[key];
     unsubscribe.mockReset();
+    sendTyping.mockReset();
+    read.mockClear();
+    fetchPage.mockReset();
+    setVisibility("visible");
+  });
+  afterEach(() => vi.useRealTimers());
+
+  describe("mensagens", () => {
+    it("mostra as mensagens lidas do servidor e o campo de envio", () => {
+      render(pane([message("m1", "primeira"), message("m2", "segunda", "c1", "2026-11-24T10:01:00.000Z")]));
+      expect(screen.getByText("primeira")).toBeInTheDocument();
+      expect(screen.getByText("segunda")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Mensagem para #geral" })).toBeInTheDocument();
+      expect(screen.queryByText("Escreva a primeira mensagem")).not.toBeInTheDocument();
+    });
+
+    it("mostra o convite a escrever quando a conversa está vazia", () => {
+      render(pane([]));
+      expect(screen.getByText("Escreva a primeira mensagem")).toBeInTheDocument();
+    });
+
+    it("acrescenta a mensagem que chega pelo tempo real, sem recarregar", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.mensagem_criada!(created(message("m2", "chegou agora", "c1", "2026-11-24T10:05:00.000Z"))));
+      expect(screen.getByText("chegou agora")).toBeInTheDocument();
+      expect(screen.getByText("primeira")).toBeInTheDocument();
+    });
+
+    it("não repete a mensagem que o tempo real entrega de novo", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.mensagem_criada!(created(message("m1", "primeira"))));
+      expect(screen.getAllByText("primeira")).toHaveLength(1);
+    });
+
+    it("ignora a mensagem de outra conversa", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.mensagem_criada!(created(message("m9", "de outra conversa", "c2"))));
+      expect(screen.queryByText("de outra conversa")).not.toBeInTheDocument();
+    });
+
+    it("junta com o que já está na tela quando o servidor relê a conversa", () => {
+      const { rerender } = render(pane([message("m1", "primeira")]));
+      act(() => handlers.mensagem_criada!(created(message("m2", "pelo tempo real", "c1", "2026-11-24T10:02:00.000Z"))));
+      rerender(pane([message("m1", "primeira"), message("m3", "do servidor", "c1", "2026-11-24T10:03:00.000Z")]));
+      expect(screen.getByText("primeira")).toBeInTheDocument();
+      expect(screen.getByText("pelo tempo real")).toBeInTheDocument();
+      expect(screen.getByText("do servidor")).toBeInTheDocument();
+    });
+
+    it("cancela as inscrições ao sair da conversa", () => {
+      const { unmount } = render(pane([]));
+      unmount();
+      expect(unsubscribe).toHaveBeenCalledTimes(2);
+    });
   });
 
-  it("mostra as mensagens lidas do servidor e o campo de envio", () => {
-    render(pane([message("m1", "primeira"), message("m2", "segunda", "c1", "2026-11-24T10:01:00.000Z")]));
-    expect(screen.getByText("primeira")).toBeInTheDocument();
-    expect(screen.getByText("segunda")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Mensagem para #geral" })).toBeInTheDocument();
-    expect(screen.queryByText("Escreva a primeira mensagem")).not.toBeInTheDocument();
+  describe("digitando", () => {
+    it("uma pessoa: @usuário está digitando; várias: Há N pessoas digitando...", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.digitando!(typing("bia", "p2")));
+      expect(screen.getByText("@bia está digitando")).toBeInTheDocument();
+      act(() => handlers.digitando!(typing("caio", "p3")));
+      expect(screen.getByText("Há 2 pessoas digitando...")).toBeInTheDocument();
+    });
+
+    it("ignora o digitando de outra conversa", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.digitando!(typing("bia", "p2", "c2")));
+      expect(screen.queryByText(/digitando/)).not.toBeInTheDocument();
+    });
+
+    it("o aviso some em 5 segundos sem novo evento", () => {
+      vi.useFakeTimers();
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.digitando!(typing("bia", "p2")));
+      act(() => void vi.advanceTimersByTime(4000));
+      expect(screen.getByText("@bia está digitando")).toBeInTheDocument();
+      act(() => void vi.advanceTimersByTime(2000));
+      expect(screen.queryByText(/digitando/)).not.toBeInTheDocument();
+    });
+
+    it("o aviso some quando chega a mensagem do mesmo autor", () => {
+      render(pane([message("m1", "primeira")]));
+      act(() => handlers.digitando!(typing("bia", "p2")));
+      act(() => handlers.mensagem_criada!(created(message("m2", "pronto", "c1", "2026-11-24T10:05:00.000Z", "p2"))));
+      expect(screen.queryByText(/digitando/)).not.toBeInTheDocument();
+    });
   });
 
-  it("mostra o convite a escrever quando a conversa está vazia", () => {
-    render(pane([]));
-    expect(screen.getByText("Escreva a primeira mensagem")).toBeInTheDocument();
+  describe("leitura", () => {
+    it("lê até a última mensagem carregada, depois de uma espera curta, com a aba visível e a rolagem no fim", () => {
+      vi.useFakeTimers();
+      render(pane([message("m1", "primeira"), message("m2", "segunda", "c1", "2026-11-24T10:01:00.000Z")]));
+      expect(read).not.toHaveBeenCalled();
+      act(() => void vi.advanceTimersByTime(500));
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read).toHaveBeenCalledWith("c1", "m2");
+    });
+
+    it("junta mensagens seguidas numa leitura só, até a última", () => {
+      vi.useFakeTimers();
+      render(pane([message("m1", "primeira")]));
+      act(() => void vi.advanceTimersByTime(100));
+      act(() => handlers.mensagem_criada!(created(message("m2", "b", "c1", "2026-11-24T10:01:00.000Z"))));
+      act(() => handlers.mensagem_criada!(created(message("m3", "c", "c1", "2026-11-24T10:02:00.000Z"))));
+      act(() => void vi.advanceTimersByTime(500));
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read).toHaveBeenCalledWith("c1", "m3");
+    });
+
+    it("não lê com a aba escondida e lê quando ela volta a ficar visível", () => {
+      vi.useFakeTimers();
+      setVisibility("hidden");
+      render(pane([message("m1", "primeira")]));
+      act(() => void vi.advanceTimersByTime(1000));
+      expect(read).not.toHaveBeenCalled();
+      setVisibility("visible");
+      act(() => void document.dispatchEvent(new Event("visibilitychange")));
+      act(() => void vi.advanceTimersByTime(500));
+      expect(read).toHaveBeenCalledWith("c1", "m1");
+    });
+
+    it("não lê conversa sem mensagens", () => {
+      vi.useFakeTimers();
+      render(pane([]));
+      act(() => void vi.advanceTimersByTime(1000));
+      expect(read).not.toHaveBeenCalled();
+    });
   });
 
-  it("acrescenta a mensagem que chega pelo tempo real, sem recarregar", () => {
-    render(pane([message("m1", "primeira")]));
-    act(() => listener!(event(message("m2", "chegou agora", "c1", "2026-11-24T10:05:00.000Z"))));
-    expect(screen.getByText("chegou agora")).toBeInTheDocument();
-    expect(screen.getByText("primeira")).toBeInTheDocument();
+  describe("histórico", () => {
+    it("carrega a página anterior pela âncora da mensagem mais antiga e mostra Início da conversa ao acabar", async () => {
+      fetchPage.mockResolvedValue({ mensagens: [message("m0", "mais antiga", "c1", "2026-11-24T09:00:00.000Z")], tem_mais: false });
+      render(pane([message("m1", "primeira")], true));
+      await userEvent.click(screen.getByRole("button", { name: "Carregar mensagens anteriores" }));
+      expect(fetchPage).toHaveBeenCalledWith("c1", "m1");
+      expect(await screen.findByText("mais antiga")).toBeInTheDocument();
+      expect(screen.getByText("Início da conversa")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Carregar mensagens anteriores" })).not.toBeInTheDocument();
+    });
+
+    it("mostra a falha e tenta de novo", async () => {
+      fetchPage.mockRejectedValueOnce(new Error("rede"));
+      render(pane([message("m1", "primeira")], true));
+      await userEvent.click(screen.getByRole("button", { name: "Carregar mensagens anteriores" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar as mensagens anteriores");
+      fetchPage.mockResolvedValueOnce({ mensagens: [message("m0", "mais antiga", "c1", "2026-11-24T09:00:00.000Z")], tem_mais: true });
+      await userEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+      expect(await screen.findByText("mais antiga")).toBeInTheDocument();
+      expect(fetchPage).toHaveBeenCalledTimes(2);
+    });
+
+    it("não repete mensagem que a página traz e já estava na tela", async () => {
+      fetchPage.mockResolvedValue({ mensagens: [message("m1", "primeira"), message("m0", "mais antiga", "c1", "2026-11-24T09:00:00.000Z")], tem_mais: true });
+      render(pane([message("m1", "primeira")], true));
+      await userEvent.click(screen.getByRole("button", { name: "Carregar mensagens anteriores" }));
+      await screen.findByText("mais antiga");
+      expect(screen.getAllByText("primeira")).toHaveLength(1);
+    });
   });
 
-  it("não repete a mensagem que o tempo real entrega de novo", () => {
-    render(pane([message("m1", "primeira")]));
-    act(() => listener!(event(message("m1", "primeira"))));
-    expect(screen.getAllByText("primeira")).toHaveLength(1);
-  });
+  describe("campo de mensagem", () => {
+    it("avisa que a pessoa digita, no máximo uma vez a cada 3 segundos", async () => {
+      let now = 1_000_000;
+      const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+      const user = userEvent.setup();
+      render(pane([message("m1", "primeira")]));
+      const field = screen.getByRole("textbox", { name: "Mensagem para #geral" });
+      await user.type(field, "ol");
+      expect(sendTyping).toHaveBeenCalledTimes(1);
+      expect(sendTyping).toHaveBeenCalledWith("c1");
+      now += 2999;
+      await user.type(field, "x");
+      expect(sendTyping).toHaveBeenCalledTimes(1);
+      now += 1;
+      await user.type(field, "á");
+      expect(sendTyping).toHaveBeenCalledTimes(2);
+      clock.mockRestore();
+    });
 
-  it("ignora a mensagem de outra conversa", () => {
-    render(pane([message("m1", "primeira")]));
-    act(() => listener!(event(message("m9", "de outra conversa", "c2"))));
-    expect(screen.queryByText("de outra conversa")).not.toBeInTheDocument();
-  });
-
-  it("junta com o que já está na tela quando o servidor relê a conversa", () => {
-    const { rerender } = render(pane([message("m1", "primeira")]));
-    act(() => listener!(event(message("m2", "pelo tempo real", "c1", "2026-11-24T10:02:00.000Z"))));
-    rerender(pane([message("m1", "primeira"), message("m3", "do servidor", "c1", "2026-11-24T10:03:00.000Z")]));
-    expect(screen.getByText("primeira")).toBeInTheDocument();
-    expect(screen.getByText("pelo tempo real")).toBeInTheDocument();
-    expect(screen.getByText("do servidor")).toBeInTheDocument();
-  });
-
-  it("cancela a inscrição ao sair da conversa", () => {
-    const { unmount } = render(pane([]));
-    unmount();
-    expect(unsubscribe).toHaveBeenCalled();
+    it("não avisa sem texto", async () => {
+      const user = userEvent.setup();
+      render(pane([message("m1", "primeira")]));
+      const field = screen.getByRole("textbox", { name: "Mensagem para #geral" });
+      await user.type(field, "   ");
+      expect(sendTyping).not.toHaveBeenCalled();
+    });
   });
 });

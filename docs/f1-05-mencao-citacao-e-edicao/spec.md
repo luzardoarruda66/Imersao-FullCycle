@@ -176,20 +176,49 @@ As regras e os mecanismos, com o porquê, ficam no LLD, nas seções citadas; ab
 construir.
 
 **Arquivo de design.** O Figma do projeto é o `GXeHfkmxrSH9mGMHTweQSP` (`docs/design-system.md`).
-A F1-05 precisa de frames novos na página Telas, nos temas claro e escuro, como a F1-02 e a F1-04.
-Eles são o primeiro passo da implementação, e o PR que os desenha acrescenta os node-ids a esta
-tabela. Convenção da F1-02: um frame claro e um escuro, com o sufixo `(escuro)`.
+Os frames desta entrega estão na seção `F1-05 Menção, citação e edição` (`2084:94529`) da página
+Telas, nos temas claro e escuro, e são o que o código implementa pelo fluxo "Do Figma para o código"
+do design system. Cada estado tem dois frames: o claro, sem sufixo, e o escuro, com o sufixo
+`(escuro)`. O tema vem do modo `Semantic` da variable, definido no próprio frame (`Light` ou
+`Dark`): a página Telas tem o modo `Dark` por padrão, então um frame sem o modo explícito aparece
+escuro.
 
-| Tela | Frame | Estados |
-| --- | --- | --- |
-| Campo de mensagem | `Mensagem / Campo / ...` | Lista de `@` aberta (com resultados, sem resultados); citação sobre o campo; editando no lugar |
-| Mensagem | `Mensagem / Item / ...` | Com menção destacada; com citação; "(editada)"; "Mensagem apagada"; citação de mensagem apagada |
-| Menu de ações | `Mensagem / Ações / ...` | Mensagem minha dentro do prazo (Citar, Copiar texto, Editar, Apagar); minha fora do prazo; de outra pessoa; apagada (sem menu) |
-| Diálogo de apagar | `Mensagem / Apagar / ...` | Confirmação |
-| Aviso | `Mensagem / Aviso / ...` | "Texto copiado"; "Não consegui copiar" |
+| Tela | Frame (claro) | Node-id claro | Node-id escuro |
+| --- | --- | --- | --- |
+| Campo de mensagem | `Mensagem / Campo / Lista de @` | `2084:94530` | `2084:94780` |
+| Campo de mensagem | `Mensagem / Campo / Lista de @ sem resultado` | `2084:98784` | `2084:99031` |
+| Campo de mensagem | `Mensagem / Campo / Citando` | `2084:95536` | `2084:95768` |
+| Campo de mensagem | `Mensagem / Campo / Editando` | `2084:96000` | `2084:96236` |
+| Campo de mensagem | `Mensagem / Campo / Editando com erro` | `2084:96472` | `2084:96820` |
+| Mensagem | `Mensagem / Item / Menção` | `2084:99500` | `2084:99724` |
+| Mensagem | `Mensagem / Item / Com citação` | `2084:99948` | `2084:100173` |
+| Mensagem | `Mensagem / Item / Editada` | `2084:100398` | `2084:100730` |
+| Mensagem | `Mensagem / Item / Apagada` | `2084:101029` | `2084:101328` |
+| Mensagem | `Mensagem / Item / Citação apagada` | `2084:101627` | `2084:101962` |
+| Menu de ações | `Mensagem / Ações / Minha no prazo` | `2084:103185` | `2084:103567` |
+| Menu de ações | `Mensagem / Ações / Minha fora do prazo` | `2084:103949` | `2084:104325` |
+| Menu de ações | `Mensagem / Ações / De outra pessoa` | `2084:104701` | `2084:105060` |
+| Diálogo de apagar | `Mensagem / Apagar / Confirmação` | `2084:105419` | `2084:105652` |
+| Aviso | `Mensagem / Aviso / Texto copiado` | `2084:105885` | `2084:106138` |
+| Aviso | `Mensagem / Aviso / Falha ao copiar` | `2084:106391` | `2084:106634` |
 
-Os frames partem dos de Conversa da F1-02 e da F1-04. A F1-05 acrescenta o que a tabela diz e nada
-mais: sem reações, sem thread, sem histórico de versões.
+Os frames partem do de referência "Uma pessoa digitando" da F1-04 (a casca sem agentes, sem
+presença e sem Atividade), com as mensagens, o campo e as sobreposições copiados dos frames de
+Conversa da F1-02 (`Conversa / Composer / ...`, `Conversa / Mensagem / ...` e
+`Conversa / Sobreposições / ...`), sem o que é de agente. A F1-05 acrescenta o que a tabela diz e
+nada mais: sem reações, sem thread, sem histórico de versões.
+
+- "Lista de @ sem resultado" mostra "Nenhuma pessoa encontrada" na lista; "Item / Apagada" mostra
+  "Mensagem apagada" em `fg-muted`, sem menu nem barra de ações.
+- "Minha fora do prazo" é a mensagem do próprio autor, mas com o menu e a barra de uma mensagem de
+  outra pessoa: sem Editar e sem Apagar. "Editando com erro" mostra a recusa por prazo
+  ("O prazo de 4 horas para editar esta mensagem acabou.").
+- **Rótulos:** o glossário diz Citação e a PRD diz **Citar**, então nos frames da F1-05 o item do
+  menu é "Citar", o aviso sobre o campo é "Citando <nome>" e a citação de mensagem apagada diz
+  "Mensagem apagada". Os componentes de referência (`MessageMenu`, `MessageComposer`, `ReplyQuote`)
+  ainda trazem "Responder", "Respondendo a" e "Em resposta a uma mensagem apagada", e a "(editado)"
+  da mensagem editada: o código implementa os rótulos dos frames, e o ajuste dos componentes fica
+  para a tarefa do menu de ações (#75).
 
 **Modelo de dados (Banco do chat)**
 

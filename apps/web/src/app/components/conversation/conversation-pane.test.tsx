@@ -129,6 +129,20 @@ describe("ConversationPane: citação", () => {
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 
+  it("uma página vazia com tem_mais não prende a busca: para e avisa", async () => {
+    fetchPage.mockResolvedValue({ mensagens: [], tem_mais: true });
+    render(pane([at(5, { citacao: quoteOf("m1") })], true));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível encontrar a mensagem citada"));
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("depois de rolar até a original, o foco vai para ela", async () => {
+    render(pane([at(1), at(2, { citacao: quoteOf("m1") })]));
+    await userEvent.click(screen.getByRole("button", { name: /Ir para a mensagem de Ana/ }));
+    expect(document.getElementById("mensagem-m1")).toHaveFocus();
+  });
+
   it("avisa quando o histórico acaba sem a original, ou quando a busca falha", async () => {
     fetchPage.mockResolvedValueOnce({ mensagens: [at(3), at(4)], tem_mais: false });
     const { unmount } = render(pane([at(5, { citacao: quoteOf("m1") })], true));

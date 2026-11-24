@@ -41,7 +41,11 @@ function QuoteLink({ quote, onGoTo }: { quote: NonNullable<ChatMessage["citacao"
   const content = (
     <>
       <CornerUpLeft size={12} aria-hidden className="shrink-0" />
-      <span className="shrink-0 font-bold">{quote.autor.nome}</span>
+      {/* O nome do botão é a frase inteira (o autor visível sai do nome para não repetir), e o trecho continua sendo lido. */}
+      {!quote.apagada && <span className="sr-only">{`Ir para a mensagem de ${quote.autor.nome}. `}</span>}
+      <span aria-hidden={!quote.apagada || undefined} className="shrink-0 font-bold">
+        {quote.autor.nome}
+      </span>
       <span className="truncate">{quote.apagada ? "Mensagem apagada" : quote.trecho}</span>
     </>
   );
@@ -50,7 +54,6 @@ function QuoteLink({ quote, onGoTo }: { quote: NonNullable<ChatMessage["citacao"
   return (
     <button
       type="button"
-      aria-label={`Ir para a mensagem de ${quote.autor.nome}: ${quote.trecho}`}
       onClick={() => onGoTo?.(quote.id)}
       className={cn(style, "w-full cursor-pointer text-left hover:text-fg hover:underline")}
     >
@@ -73,7 +76,7 @@ function MessageItem({
   onGoToMessage?: (id: string) => void;
 }) {
   return (
-    <li id={`mensagem-${message.id}`} className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
+    <li id={`mensagem-${message.id}`} tabIndex={-1} className="group/message relative flex gap-3 px-4 py-1 hover:bg-surface-subtle focus-within:bg-surface-subtle">
       <Avatar name={message.autor.nome} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline gap-2">

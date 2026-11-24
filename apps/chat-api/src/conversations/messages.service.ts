@@ -63,7 +63,6 @@ export class MessagesService {
    */
   async send(conversationId: string, authorId: string, text: string, quoteId?: string): Promise<ChatMessage> {
     const conversation = await this.access.requireAccess(conversationId, authorId);
-    const quote = quoteId === undefined ? null : await this.requireQuotable(conversation.id, quoteId);
     const everyone = await this.access.participantIds(conversation);
     // Ordem fixa: duas transações que somam nas mesmas linhas as travam na mesma ordem, sem impasse.
     const others = everyone.filter((id) => id !== authorId).sort();
@@ -73,6 +72,8 @@ export class MessagesService {
     const createdAt = new Date();
 
     const { message, counts } = await this.dataSource.transaction(async (manager) => {
+      // A citada é lida e travada para compartilhar na transação: uma exclusão que chegue agora espera a mensagem entrar.
+      const quote = quoteId === undefined ? null : await this.requireQuotable(manager, conversation.id, quoteId);
       const [author] = await manager.query<{ name: string; username: string }[]>(
         `SELECT name, username FROM people WHERE id = $1`,
         [authorId],
@@ -170,11 +171,12 @@ export class MessagesService {
   }
 
   /** A mensagem citada: da mesma conversa e ainda não apagada. Qualquer outra coisa é `dados_invalidos`, sem dizer qual. */
-  private async requireQuotable(conversationId: string, quoteId: string): Promise<QuoteSource> {
-    const [row] = await this.dataSource.query<QuoteSource[]>(
+  private async requireQuotable(manager: EntityManager, conversationId: string, quoteId: string): Promise<QuoteSource> {
+    const [row] = await manager.query<QuoteSource[]>(
       `SELECT q.id, q.text, q.deleted_at, a.id AS author_id, a.name AS author_name, a.username AS author_username
          FROM messages q JOIN people a ON a.id = q.author_id
-        WHERE q.id = $1 AND q.conversation_id = $2`,
+        WHERE q.id = $1 AND q.conversation_id = $2
+          FOR SHARE OF q`,
       [quoteId, conversationId],
     );
     if (!row || row.deleted_at !== null) throw invalidField('citacao_id', 'A mensagem citada não existe nesta conversa.');

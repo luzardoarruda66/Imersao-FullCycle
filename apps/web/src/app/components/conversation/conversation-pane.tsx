@@ -138,10 +138,19 @@ export function ConversationPane({
     if (!element) return;
     pendingScroll.current = null;
     element.scrollIntoView?.({ block: "center" });
+    // O foco vai para a mensagem: quem usa teclado ou leitor de tela continua dali, e a barra de ações a destaca.
+    element.focus({ preventScroll: true });
   }, []);
   useEffect(() => flushScroll(), [messages, flushScroll]);
 
   // O que `goToMessage` lê no meio de uma espera: o estado de agora, e não o da renderização em que ele nasceu.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const messagesRef = useRef(messages);
   const hasMoreRef = useRef(hasMore);
   useEffect(() => {
@@ -158,7 +167,7 @@ export function ConversationPane({
         let found = false;
         setLoadingOlder(true);
         try {
-          while (more && oldest) {
+          while (more && oldest && alive.current) {
             const page = await fetchMessagePage(conversationId, oldest);
             setMessages((current) => mergeMessages(current, page.mensagens));
             more = page.tem_mais;
@@ -167,7 +176,10 @@ export function ConversationPane({
               found = true;
               break;
             }
-            oldest = page.mensagens[0]?.id ?? oldest;
+            // Uma página vazia, ou que não anda para trás, encerra a busca em vez de repetir o mesmo pedido.
+            const next = page.mensagens[0]?.id;
+            if (!next || next === oldest) break;
+            oldest = next;
           }
         } catch {
           // cai no aviso abaixo

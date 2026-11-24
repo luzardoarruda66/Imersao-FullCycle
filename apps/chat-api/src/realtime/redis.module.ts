@@ -9,7 +9,7 @@ export const REDIS = Symbol('REDIS');
 class RedisShutdown implements OnApplicationShutdown {
   constructor(@Inject(REDIS) private readonly redis: Redis) {}
 
-  async onApplicationShutdown() {
+  onApplicationShutdown() {
     this.redis.disconnect();
   }
 }

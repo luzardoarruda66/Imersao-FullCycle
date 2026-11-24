@@ -14,6 +14,7 @@ import { PersonEventsStore } from './person-events.store.js';
 
 type RefusalCode = 'sessao_invalida' | 'origem_invalida';
 
+// `Error` com `data`, e não `WsException`: o middleware do Socket.IO não passa pelo filtro do Nest, e o cliente lê `connect_error.data.code`.
 function refuse(code: RefusalCode, message: string) {
   return Object.assign(new Error(code), { data: { code, message } });
 }
@@ -77,8 +78,6 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnMo
   private async start(connection: Connection, lastEvent: string | undefined) {
     const { socket, personId } = connection;
     let reference: string | null;
-    
-
     if (lastEvent === undefined) {
       reference = await this.store.currentId(personId);
     } else {

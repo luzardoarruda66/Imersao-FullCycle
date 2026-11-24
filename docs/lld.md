@@ -118,8 +118,9 @@ Situação de todas: `planejada`.
   uma gravação no Redis falha, a época é trocada assim que o Redis voltar a responder: o evento
   que não foi guardado nunca vira um buraco silencioso.
 - **Primeira conexão da aba** (sem último evento): não há reposição; o servidor devolve `pronto`
-  com o identificador atual da pessoa, ponto de partida da aba. Sem eventos guardados, o
-  identificador é o da origem (`época-0-0`). Com o Redis fora, `pronto` leva `ultimo_evento` nulo, e
+  com o identificador atual da pessoa, ponto de partida da aba. O identificador nunca é
+  anterior ao instante da conexão (sem eventos recentes, é `época-instante-0`), para que a
+  retenção também valha para a aba que não recebeu nada. Com o Redis fora, `pronto` leva `ultimo_evento` nulo, e
   o cliente guarda a marca `indisponivel`: na reconexão seguinte o servidor, que não a entende,
   responde `perdido`.
 - **Reposição.** A conexão entra no registro de conexões da pessoa (em memória, uma instância só da API; sem salas do Socket.IO, para poder guardar os eventos de uma conexão sem afetar as outras) e guarda, sem entregar, os eventos ao vivo que

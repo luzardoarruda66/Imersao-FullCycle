@@ -72,8 +72,11 @@ export class PersonEventsStore {
     try {
       const epoch = await this.currentEpoch();
       const last = await this.redis.xrevrange(this.streamKey(personId), '+', '-', 'COUNT', 1);
-      const streamId = last[0]?.[0] ?? '0-0';
-      return `${epoch}-${streamId}`;
+      // Nunca anterior a "agora": o ponto de partida entra na regra de retenção como qualquer outro identificador.
+      const floor = this.clock.now() - 1;
+      const lastId = last[0]?.[0];
+      if (lastId && Number(lastId.split('-')[0]) >= floor) return `${epoch}-${lastId}`;
+      return formatEventId({ epoch, time: floor, seq: 0 });
     } catch {
       return null;
     }
@@ -86,8 +89,7 @@ export class PersonEventsStore {
     try {
       const epoch = await this.currentEpoch();
       if (parsed.epoch !== epoch) return { status: 'lost' };
-      const isOrigin = parsed.time === 0 && parsed.seq === 0;
-      if (!isOrigin && this.clock.now() - parsed.time > RECONNECT_RETENTION_MS) return { status: 'lost' };
+      if (this.clock.now() - parsed.time > RECONNECT_RETENTION_MS) return { status: 'lost' };
       const entries = await this.redis.xrange(this.streamKey(personId), `(${parsed.time}-${parsed.seq}`, '+');
       const events = entries.map(([streamId, fields]) => {
         const stored = JSON.parse(fields[1]!) as Omit<ChatEvent, 'id'>;

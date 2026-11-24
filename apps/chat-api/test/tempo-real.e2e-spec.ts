@@ -33,7 +33,7 @@ describe('Tempo real (e2e Socket.IO)', () => {
       const c = await t.connect({ cookie: await login(ANA) });
       await c.waitFor(() => c.ready.length === 1);
       expect(c.socket.connected).toBe(true);
-      expect(c.ready[0]!.ultimo_evento).toMatch(/^[0-9a-f]+-0-0$/);
+      expect(c.ready[0]!.ultimo_evento).toMatch(/^[0-9a-f]+-\d+-0$/);
     });
 
     it('recusa sem cookie e com cookie inválido, com sessao_invalida', async () => {
@@ -180,6 +180,20 @@ describe('Tempo real (e2e Socket.IO)', () => {
       await t.redis.flushdb();
       const second = await t.connect({ cookie: sid, lastEvent: confirmed });
       await second.waitFor(() => second.lost === 1);
+    });
+
+    it('responde perdido a uma aba sem eventos que ficou fora além da retenção', async () => {
+      const sid = await login(ANA);
+      const first = await t.connect({ cookie: sid });
+      await first.waitFor(() => first.ready.length === 1);
+      const start = first.ready[0]!.ultimo_evento!;
+      first.close();
+      await diagnostics.publish(anaId, 'perdido no meio');
+      t.clock.advance(RECONNECT_RETENTION_MS + SECOND);
+      await diagnostics.publish(anaId, 'aparou o anterior');
+      const second = await t.connect({ cookie: sid, lastEvent: start });
+      await second.waitFor(() => second.lost === 1);
+      expect(second.events).toEqual([]);
     });
 
     it('responde perdido com identificador ilegível', async () => {

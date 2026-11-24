@@ -10,7 +10,7 @@ describe('Entrar, sessão e trocar a senha (e2e HTTP)', () => {
 
   beforeEach(async () => {
     t = await createTestApp();
-    await t.people.create({ email: EMAIL, name: 'Ana', password: PASSWORD });
+    await t.createPerson({ email: EMAIL, name: 'Ana' });
   });
   afterEach(() => t.close());
 

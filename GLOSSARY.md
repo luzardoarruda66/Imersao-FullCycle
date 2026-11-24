@@ -29,7 +29,11 @@ Autorização de um membro para pedir e receber dados de negócio.
 _Evite_: acesso ao banco, permissão de leitura
 
 **Perfil**:
-Nome, cargo, telefone, status e presença de um membro, visíveis para todo o workspace.
+Nome, @usuário, cargo, telefone, status e presença de um membro, visíveis para todo o workspace.
+
+**@usuário**:
+Identificador único de um membro, definido pela operação junto com a conta e usado na busca de pessoas e na menção. Só a operação o troca.
+_Evite_: username, handle, login, apelido
 
 **Presença**:
 Se o membro está online ou ausente.

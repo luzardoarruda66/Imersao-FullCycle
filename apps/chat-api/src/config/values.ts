@@ -18,3 +18,7 @@ export const RECONNECT_RETENTION_MS = 15 * 60 * 1000;
 export const SESSION_CHECK_INTERVAL_MS = 2000;
 // Prazo sem uso da sessão em ms, para a conferência das conexões abertas; derivado de `SESSION_DURATION`.
 export const SESSION_IDLE_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
+
+// Contas (LLD, seção 9, "Valores e configuração").
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 30;

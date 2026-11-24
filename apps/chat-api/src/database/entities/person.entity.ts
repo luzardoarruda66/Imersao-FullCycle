@@ -12,6 +12,20 @@ export class PersonEntity {
   @Column({ type: 'text' })
   name: string;
 
+  /** O @usuário, sem o `@`: gravado em minúsculas, obrigatório e único (LLD, "Dados"). */
+  @Column({ type: 'text', unique: true })
+  username: string;
+
+  /** Cargo, telefone e status: opcionais, lidos pelo Perfil (F1-03) e escritos pela F1-07. */
+  @Column({ type: 'text', name: 'job_title', nullable: true })
+  jobTitle: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  phone: string | null;
+
+  @Column({ type: 'text', name: 'status_text', nullable: true })
+  statusText: string | null;
+
   @Column({ type: 'text', name: 'password_hash' })
   passwordHash: string;
 

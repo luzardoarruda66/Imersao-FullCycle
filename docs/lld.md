@@ -270,7 +270,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 
 | Banco | Entidade (HLD, seção 7) | Situação |
 | --- | --- | --- |
-| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | existe |
+| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único. @usuário (`username`) obrigatório e único, gravado em minúsculas; cargo, telefone e status opcionais, lidos pela F1-03 e escritos pela F1-07. A busca ignora acentos e maiúsculas com a extensão `unaccent` do Postgres, que a migração cria. As contas que já existiam receberam o @usuário na migração, derivado da parte do e-mail antes do `@`, com sufixo numérico em colisão | existe |
 | Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | existe |
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
 | Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes (só no canal privado e na conversa direta: o canal público não os grava). Nome do canal único sem diferenciar maiúsculas, valendo entre público e privado; um par de membros só tem uma conversa direta, pela chave `menorId:maiorId` | existe |
@@ -329,6 +329,8 @@ de eventos do WebSocket estão a definir. O que já está decidido:
 | `GET /v1/membros` (API do chat) | existe | Os membros do workspace, só `id` e `nome` (o perfil é da F1-03) |
 | Evento `mensagem_criada` (WebSocket) | existe | Publicado depois do commit da mensagem, para quem vê a conversa ("Segurança"); leva o id da conversa e a mensagem completa |
 | Evento `conversa_visivel` (WebSocket) | existe | Publicado quando a pessoa passa a ver uma conversa: canal público novo (todos os membros), canal privado novo (o criador), conversa direta nova (os dois) e convite (só quem foi convidado de fato). Leva só o id da conversa; o `web` relê a lateral |
+| `GET /v1/pessoas` (API do chat) | planejada | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
+| `GET /v1/pessoas/:id` (API do chat) | planejada | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
 
 ## 6. Estados e regras
 
@@ -368,11 +370,13 @@ Os números estão em "Valores e configuração".
 - **Trocar a senha.** Exige a senha atual; com ela errada, nada muda. A nova senha cumpre a
   `regra da senha`, e a recusa lista as regras que faltaram. Depois da troca, a sessão atual
   continua e as outras sessões da pessoa são apagadas.
-- **Operação.** O comando `contas` da API do chat cria a conta (e-mail e nome), redefine a senha,
-  encerra as sessões, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
+- **Operação.** O comando `contas` da API do chat cria a conta (e-mail, @usuário e nome), redefine a
+  senha, encerra as sessões, troca o @usuário, dá e tira o papel de administrador e a permissão de dados. Criar e redefinir
   geram uma senha aleatória que cumpre a `regra da senha` e a mostram uma vez só; não há troca
   obrigatória no primeiro acesso. Encerrar as sessões, ou redefinir a senha, apaga todas as
   sessões da pessoa.
+  `criar` e `definir-usuario` recusam @usuário em uso ou fora do formato (`formato do @usuário`), com
+  mensagem clara. Trocar o @usuário não encerra as sessões da conta; só a operação o troca.
 
 ## 7. Processos de segundo plano
 
@@ -397,8 +401,8 @@ definir.
 | A definir | Sessão | Histórico da conversa | Editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Contadores de não lidas e de menções, na lateral | — | a detalhar |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
-| A definir | Sessão | Perfil próprio e de outras pessoas | Editar o próprio perfil e a presença | a detalhar |
-| A definir | Sessão | Busca de pessoas | Abrir conversa direta | a detalhar |
+| `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | planejada |
+| Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | planejada |
 | A definir | Sessão; conectar e desconectar só para administrador | Agentes e estado de conexão | Conectar e desconectar agente | a detalhar |
 
 **Leituras e tempo real.** A página carrega pelos Server Components. No cliente, o SWR guarda as
@@ -464,6 +468,8 @@ entra quando a F1-04 trouxer as não lidas ("Questões em aberto").
 | Tamanho do nome do canal | 1 a 80 caracteres | API do chat e `web` | Constante `CHANNEL_NAME_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` (projetos independentes, [ADR 0017](adr/0017-projetos-pnpm-independentes.md)) |
 | Tamanho da mensagem | Até 4.000 caracteres | API do chat e `web` | Constante `MESSAGE_TEXT_MAX`, no mesmo arquivo, e a cópia em `apps/web/src/lib/schemas.ts` |
 | Convidados por pedido | Até 100 | API do chat | Constante `INVITE_MAX`, no mesmo arquivo |
+| Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | Constantes `USERNAME_MIN_LENGTH` e `USERNAME_MAX_LENGTH`, no mesmo arquivo; função `isValidUsername`, em `apps/chat-api/src/accounts/username-rule.ts` |
+| Resultados da busca de pessoas | No máximo 20 | API do chat | A definir |
 
 **Variáveis de ambiente**
 

@@ -4,10 +4,12 @@ import type { ChatMessage, ReadCounts } from 'chat-events';
 import { DataSource, type EntityManager } from 'typeorm';
 import { v7 as uuidv7 } from 'uuid';
 import { MESSAGES_PER_PAGE } from '../config/values.js';
+import { MentionEntity } from '../database/entities/mention.entity.js';
 import { MessageEntity } from '../database/entities/message.entity.js';
 import { AppError } from '../errors/app-error.js';
 import { ConversationAccessService } from './conversation-access.service.js';
 import { ConversationEvents } from './conversation-events.service.js';
+import { MentionsService, type MentionRef } from './mentions.service.js';
 
 export interface MessagePage {
   mensagens: ChatMessage[];
@@ -24,6 +26,7 @@ export class MessagesService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly access: ConversationAccessService,
     private readonly events: ConversationEvents,
+    private readonly mentions: MentionsService,
   ) {}
 
   /**
@@ -45,18 +48,22 @@ export class MessagesService {
     );
     const hasMore = rows.length > MESSAGES_PER_PAGE;
     const page = rows.slice(0, MESSAGES_PER_PAGE).reverse();
-    return { mensagens: page.map((row) => toChatMessage(conversation.id, row)), tem_mais: hasMore };
+    const mentionsOf = await this.mentions.forMessages(page.map((row) => row.id));
+    return { mensagens: page.map((row) => toChatMessage(conversation.id, row, mentionsOf.get(row.id) ?? [])), tem_mais: hasMore };
   }
 
   /**
-   * Grava a mensagem e soma 1 a `nao_lidas` de cada participante que não é o autor, na mesma transação e num único
-   * comando (incremento no próprio `UPDATE`, sem ler antes). O evento sai só depois do commit (ADR 0025).
+   * Grava a mensagem e as menções e soma 1 a `nao_lidas` de cada participante que não é o autor, e 1 a `mencoes` de
+   * cada mencionado, na mesma transação e num único comando (incremento no próprio `UPDATE`, sem ler antes). O evento
+   * sai só depois do commit (ADR 0025).
    */
   async send(conversationId: string, authorId: string, text: string): Promise<ChatMessage> {
     const conversation = await this.access.requireAccess(conversationId, authorId);
     const everyone = await this.access.participantIds(conversation);
     // Ordem fixa: duas transações que somam nas mesmas linhas as travam na mesma ordem, sem impasse.
     const others = everyone.filter((id) => id !== authorId).sort();
+    const mentioned = await this.mentions.resolve(everyone, authorId, text);
+    const mentionedIds = new Set(mentioned.map((mention) => mention.id));
     const id = uuidv7();
     const createdAt = new Date();
 
@@ -66,15 +73,19 @@ export class MessagesService {
         [authorId],
       );
       await manager.insert(MessageEntity, { id, conversationId: conversation.id, authorId, text, createdAt });
+      if (mentioned.length > 0) {
+        await manager.insert(MentionEntity, mentioned.map((mention) => ({ messageId: id, personId: mention.id, createdAt })));
+      }
       const counts = new Map<string, ReadCounts>();
       if (others.length > 0) {
         const rows = await manager.query<CountRow[]>(
-          `INSERT INTO conversation_read_states AS rs (conversation_id, person_id, unread_count)
-           SELECT $1, p, 1 FROM unnest($2::uuid[]) AS p ORDER BY p
+          `INSERT INTO conversation_read_states AS rs (conversation_id, person_id, unread_count, mention_count)
+           SELECT $1, t.person, 1, t.mention FROM unnest($2::uuid[], $3::int[]) AS t(person, mention) ORDER BY t.person
            ON CONFLICT (conversation_id, person_id)
-           DO UPDATE SET unread_count = rs.unread_count + 1, updated_at = now()
+           DO UPDATE SET unread_count = rs.unread_count + 1, mention_count = rs.mention_count + EXCLUDED.mention_count,
+                         updated_at = now()
            RETURNING person_id, unread_count, mention_count`,
-          [conversation.id, others],
+          [conversation.id, others, others.map((personId) => (mentionedIds.has(personId) ? 1 : 0))],
         );
         for (const row of rows) counts.set(row.person_id, toCounts(row));
       }
@@ -91,7 +102,7 @@ export class MessagesService {
         author_id: authorId,
         author_name: author!.name,
         author_username: author!.username,
-      });
+      }, mentioned);
       return { message, counts };
     });
 
@@ -127,7 +138,10 @@ export class MessagesService {
                   SELECT count(*)::int FROM messages m
                    WHERE m.conversation_id = $1 AND m.author_id <> $2
                      AND (m.created_at, m.id) > (SELECT a.created_at, a.id FROM messages a WHERE a.id = $3)),
-                mention_count = 0,
+                mention_count = (
+                  SELECT count(*)::int FROM mentions mn JOIN messages m ON m.id = mn.message_id
+                   WHERE mn.person_id = $2 AND m.conversation_id = $1
+                     AND (m.created_at, m.id) > (SELECT a.created_at, a.id FROM messages a WHERE a.id = $3)),
                 updated_at = now()
           WHERE rs.conversation_id = $1 AND rs.person_id = $2
             AND (rs.last_read_message_id IS NULL
@@ -175,15 +189,15 @@ interface CountRow {
 
 const toCounts = (row: CountRow): ReadCounts => ({ nao_lidas: row.unread_count, mencoes: row.mention_count });
 
-function toChatMessage(conversationId: string, row: MessageRow): ChatMessage {
+function toChatMessage(conversationId: string, row: MessageRow, mencoes: MentionRef[] = []): ChatMessage {
   return {
     id: row.id,
     conversa_id: conversationId,
     autor: { id: row.author_id, nome: row.author_name, usuario: row.author_username },
     texto: row.text,
     criada_em: row.created_at.toISOString(),
-    // Preenchidos pelas tarefas de menção, citação, edição e exclusão da F1-05.
-    mencoes: [],
+    mencoes,
+    // Preenchidos pelas tarefas de citação, edição e exclusão da F1-05.
     citacao: null,
     editada_em: null,
     apagada: false,

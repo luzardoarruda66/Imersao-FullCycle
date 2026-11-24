@@ -16,7 +16,9 @@ import {
   type ReadDto,
   type SendMessageDto,
 } from './conversations.schemas.js';
+import { searchPeopleSchema, type SearchPeopleDto } from '../people/directory.schemas.js';
 import { ConversationsService } from './conversations.service.js';
+import { MentionsService } from './mentions.service.js';
 import { MessagesService } from './messages.service.js';
 
 @ApiTags('conversas')
@@ -25,6 +27,7 @@ export class ConversationsController {
   constructor(
     private readonly conversations: ConversationsService,
     private readonly messages: MessagesService,
+    private readonly mentions: MentionsService,
   ) {}
 
   @ApiOperation({ summary: 'As conversas do membro, separadas por tipo' })
@@ -67,6 +70,16 @@ export class ConversationsController {
     @CurrentUser('id') personId: string,
   ) {
     return this.messages.page(id, personId, query.antes);
+  }
+
+  @ApiOperation({ summary: 'Os participantes da conversa que a pessoa pode mencionar, filtrados por nome ou @usuário' })
+  @Get(':id/mencionaveis')
+  async mentionable(
+    @Param('id') id: string,
+    @Query({ schema: searchPeopleSchema }) query: SearchPeopleDto,
+    @CurrentUser('id') personId: string,
+  ) {
+    return { pessoas: await this.mentions.mentionable(id, personId, query.busca) };
   }
 
   @ApiOperation({ summary: 'Registrar a leitura da conversa até uma mensagem; devolve as contagens' })

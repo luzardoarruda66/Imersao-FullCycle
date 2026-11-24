@@ -441,6 +441,39 @@
         ]
       }
     },
+    "/v1/conversas/{id}/mencionaveis": {
+      "get": {
+        "operationId": "ConversationsController_mentionable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "busca",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Os participantes da conversa que a pessoa pode mencionar, filtrados por nome ou @usuário",
+        "tags": [
+          "conversas"
+        ]
+      }
+    },
     "/v1/conversas/{id}/leitura": {
       "post": {
         "operationId": "ConversationsController_markRead",

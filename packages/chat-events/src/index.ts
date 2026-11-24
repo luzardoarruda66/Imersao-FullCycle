@@ -40,7 +40,7 @@ export const chatMessageSchema = z.object({
   texto: z.string(),
   criada_em: z.string().min(1),
   /** As pessoas mencionadas, para o cliente destacar só as menções reais. */
-  mencoes: z.array(z.object({ id: z.string().min(1), usuario: z.string().min(1) })).default([]),
+  mencoes: z.array(memberRefSchema.pick({ id: true, usuario: true })).default([]),
   citacao: quoteSchema.nullable().default(null),
   editada_em: z.string().min(1).nullable().default(null),
   apagada: z.boolean().default(false),

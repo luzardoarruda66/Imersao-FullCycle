@@ -1,5 +1,7 @@
 import type { ChatMessage } from "chat-events";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { MessageList } from "./message-list";
 
 const at = (id: string, date: Date, autor = "Ana", texto = id): ChatMessage => ({
@@ -11,7 +13,47 @@ const at = (id: string, date: Date, autor = "Ana", texto = id): ChatMessage => (
   mencoes: [], citacao: null, editada_em: null, apagada: false,
 });
 
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastSuccess = vi.mocked(toast.success);
+const toastError = vi.mocked(toast.error);
+
 describe("MessageList", () => {
+  describe("ações da mensagem", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const one = (over: Partial<ChatMessage> = {}) => [{ ...at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "Oi @bia, tudo bem?"), ...over }];
+
+    it("cada mensagem tem a barra de ações com Copiar texto", () => {
+      render(<MessageList messages={one()} intro={null} />);
+      expect(screen.getByRole("toolbar", { name: "Ações da mensagem" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Copiar texto" })).toBeInTheDocument();
+    });
+
+    it("Copiar texto copia o texto puro, com o @usuário, e avisa o sucesso", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      toastSuccess.mockClear();
+      render(<MessageList messages={one({ mencoes: [{ id: "p2", usuario: "bia" }] })} intro={null} />);
+      await userEvent.click(screen.getByRole("button", { name: "Copiar texto" }));
+      expect(writeText).toHaveBeenCalledWith("Oi @bia, tudo bem?");
+      expect(toastSuccess).toHaveBeenCalledWith("Texto copiado");
+    });
+
+    it("com o navegador recusando, avisa a falha", async () => {
+      vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("negado")) } });
+      toastError.mockClear();
+      render(<MessageList messages={one()} intro={null} />);
+      await userEvent.click(screen.getByRole("button", { name: "Copiar texto" }));
+      expect(toastError).toHaveBeenCalledWith("Não foi possível copiar o texto");
+    });
+
+    it("mensagem apagada mostra o aviso no lugar do texto e não tem menu", () => {
+      render(<MessageList messages={one({ apagada: true, texto: "" })} intro={null} />);
+      expect(screen.getByText("Mensagem apagada")).toBeInTheDocument();
+      expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copiar texto" })).not.toBeInTheDocument();
+    });
+  });
+
   it("destaca só as menções que a API reconheceu, como texto da mensagem", () => {
     const message = { ...at("m1", new Date(2026, 10, 24, 14, 10), "Ana", "Oi @bia, escreva para caio@empresa.com ou @ninguem"), mencoes: [{ id: "p2", usuario: "bia" }] };
     render(<MessageList messages={[message]} intro={null} />);

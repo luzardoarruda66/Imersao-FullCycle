@@ -36,7 +36,7 @@ O ambiente de desenvolvimento usa o `compose.yaml`, na raiz, com cinco serviços
 | `chat-api` | API em NestJS, REST e WebSocket | `http://localhost:3001` | `http://chat-api:3001` |
 | `postgres` | PostgreSQL, com os bancos `chat`, `agents` e `business` | `localhost:5432` | `postgres:5432` |
 | `s3` | Emulador do S3 (`seaweedfs`) | `http://localhost:8333` | `http://s3:8333` |
-| `redis` | Redis, com os eventos de reconexão do WebSocket (planejado pela FD-03) | `localhost:6379` | `redis:6379` |
+| `redis` | Redis, com os eventos de reconexão do WebSocket | `localhost:6379` | `redis:6379` |
 
 Os contêineres `web` e `chat-api` instalam as dependências ao subir e depois ficam parados, sem iniciar a aplicação. Os comandos rodam neles com `docker compose -f compose.yaml exec <serviço> <comando>` e os de cada projeto estão no `AGENTS.md` dele.
 

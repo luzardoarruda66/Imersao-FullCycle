@@ -14,7 +14,7 @@
 | Contrato REST da API do chat | `apps/chat-api/openapi.json`, gerado pelo `@nestjs/swagger` (`pnpm openapi`); o teste E2E falha quando ele fica velho |
 | Contrato REST do Serviço de agentes | `apps/agents/openapi.json`, gerado pelo FastAPI (planejado) |
 | Catálogo de códigos de erro | Os snapshots OpenAPI, como enum na resposta de erro de cada rota (`apps/chat-api`: existe; os outros projetos, planejado) |
-| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `pronto` e `perdido` planejados pela FD-03; os outros, com as funcionalidades que os emitem) |
+| Eventos do WebSocket | Schemas Zod e tipos em `packages/chat-events/` (`diagnostico`, `pronto` e `perdido` existem; os outros, com as funcionalidades que os emitem) |
 | Schema do Banco do chat | `apps/chat-api/migrations/`, migrações do TypeORM |
 | Schema do Banco dos agentes | A definir |
 | Schema do Banco de negócio | Script de carga em `apps/agents/scripts/` (planejado) |
@@ -42,7 +42,7 @@ apps/
                   dois processos do mesmo projeto
     scripts/      script de carga do Banco de negócio                 planejada
 packages/
-  chat-events/    schemas e tipos dos eventos do WebSocket, usados    planejada
+  chat-events/    schemas e tipos dos eventos do WebSocket, usados    existe
                   por chat-api e web
 docs/             HLD, LLD, ADRs, brief
 ```
@@ -100,7 +100,7 @@ Situação de todas: `planejada`.
 | Enfileirar | Identificador de pedido e consulta já conferida | Nada | Enfileirar duas vezes o mesmo identificador gera uma tarefa só |
 | Consumir | — | Uma tarefa ao Worker | Se o Worker falha, a tarefa volta à fila até `tentativas do Worker` |
 
-**Eventos por pessoa (Redis)** — usado pela API do chat para a reconexão (HLD 6.2). Situação: `planejada`.
+**Eventos por pessoa (Redis)** — usado pela API do chat para a reconexão (HLD 6.2). Situação: `existe`.
 
 | Operação | Recebe | Devolve | Garante |
 | --- | --- | --- | --- |
@@ -118,8 +118,11 @@ Situação de todas: `planejada`.
   uma gravação no Redis falha, a época é trocada assim que o Redis voltar a responder: o evento
   que não foi guardado nunca vira um buraco silencioso.
 - **Primeira conexão da aba** (sem último evento): não há reposição; o servidor devolve `pronto`
-  com o identificador atual da pessoa, ponto de partida da aba.
-- **Reposição.** A conexão entra na sala da pessoa e guarda, sem entregar, os eventos ao vivo que
+  com o identificador atual da pessoa, ponto de partida da aba. Sem eventos guardados, o
+  identificador é o da origem (`época-0-0`). Com o Redis fora, `pronto` leva `ultimo_evento` nulo, e
+  o cliente guarda a marca `indisponivel`: na reconexão seguinte o servidor, que não a entende,
+  responde `perdido`.
+- **Reposição.** A conexão entra no registro de conexões da pessoa (em memória, uma instância só da API; sem salas do Socket.IO, para poder guardar os eventos de uma conexão sem afetar as outras) e guarda, sem entregar, os eventos ao vivo que
   chegam. Reenvia em ordem o que veio depois do último evento confirmado e então libera os guardados
   com identificador maior que o último reenviado, e depois `pronto`. Nenhum evento sai duas vezes
   nem fora de ordem.

@@ -20,9 +20,9 @@ const IDLE: OpenDirectState = { status: "idle" };
 
 class SessionEndedError extends Error {}
 
-/** A busca pelo BFF. A resposta de uma busca anterior nunca aparece: o SWR só entrega o resultado da chave atual. */
-async function fetchPeople(url: string): Promise<PersonSummary[]> {
-  const response = await fetch(url);
+/** A busca pelo BFF. A leitura anterior é cancelada a cada digitação, e o SWR só entrega o resultado da chave atual. */
+async function fetchPeople(url: string, signal: AbortSignal): Promise<PersonSummary[]> {
+  const response = await fetch(url, { signal });
   if (response.status === 401) throw new SessionEndedError();
   if (!response.ok) throw new Error("A busca falhou.");
   const body = (await response.json()) as { pessoas: PersonSummary[] };
@@ -55,15 +55,24 @@ function SearchBody() {
   const [, startTransition] = useTransition();
   const field = useRef<HTMLInputElement>(null);
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
+  const inflight = useRef<AbortController | null>(null);
 
-  const { data, error, isLoading, mutate } = useSWR(`/api/pessoas?busca=${encodeURIComponent(term)}`, fetchPeople, {
-    revalidateOnFocus: false,
-    shouldRetryOnError: false,
-    onError: (failure) => {
-      // A sessão não vale mais: o BFF já apagou o cookie; reler a casca leva a "Entrar" (LLD, seção 8).
-      if (failure instanceof SessionEndedError) router.refresh();
+  const { data, error, isLoading, mutate } = useSWR(
+    `/api/pessoas?busca=${encodeURIComponent(term)}`,
+    (url: string) => {
+      inflight.current?.abort();
+      inflight.current = new AbortController();
+      return fetchPeople(url, inflight.current.signal);
     },
-  });
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      onError: (failure) => {
+        // A sessão não vale mais: o BFF já apagou o cookie; reler a casca leva a "Entrar" (LLD, seção 8).
+        if (failure instanceof SessionEndedError) router.refresh();
+      },
+    },
+  );
 
   const results = data ?? [];
   const searching = term.trim() !== "";
@@ -190,7 +199,7 @@ function SearchBody() {
         </p>
       )}
       {state.status === "error" && !pending && (
-        <p role="alert" className="text-small text-danger-fg px-2">
+        <p role="alert" className="px-2 text-small text-danger-fg">
           {state.message}
         </p>
       )}

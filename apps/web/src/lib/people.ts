@@ -8,7 +8,7 @@ export interface PersonProfile {
   status: string | null;
 }
 
-/** Um resultado da busca de pessoas: o suficiente para escolher e para distinguir `joao.silva` de `joao_silva`. */
+/** Um resultado da busca de pessoas (a descrição do contrato está na API do chat, módulo de pessoas). */
 export interface PersonSummary {
   id: string;
   nome: string;

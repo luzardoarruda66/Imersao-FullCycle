@@ -25,6 +25,9 @@ export interface PersonSummary {
   usuario: string;
 }
 
+/** O nome sem acento e em minúsculas: a base da busca e da ordem (LLD, "Dados"; extensão `unaccent`). */
+const PLAIN_NAME = 'unaccent(lower(p.name))';
+
 const personNotFound = () => new AppError('pessoa_inexistente', 404, 'Esta pessoa não existe.');
 
 @Injectable()
@@ -42,12 +45,12 @@ export class DirectoryService {
       .createQueryBuilder('p')
       .select(['p.id', 'p.name', 'p.username'])
       .where('p.id <> :personId', { personId })
-      .orderBy('unaccent(lower(p.name))', 'ASC')
+      .orderBy(PLAIN_NAME, 'ASC')
       .addOrderBy('p.id', 'ASC')
       .limit(PEOPLE_SEARCH_LIMIT);
     if (normalized) {
       const like = `'%' || unaccent(lower(:term)) || '%' ESCAPE '\\'`;
-      query.andWhere(`(unaccent(lower(p.name)) LIKE ${like} OR p.username LIKE ${like})`, { term: escapeLike(normalized) });
+      query.andWhere(`(${PLAIN_NAME} LIKE ${like} OR p.username LIKE ${like})`, { term: escapeLike(normalized) });
     }
     const rows = await query.getMany();
     return rows.map((row) => ({ id: row.id, nome: row.name, usuario: row.username }));

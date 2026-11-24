@@ -104,6 +104,28 @@ describe("PeopleSearchDialog", () => {
     expect(rows()).toEqual(["Luiz Carlos@luiz.carlos"]);
   });
 
+  it("cancela a leitura anterior a cada digitação", async () => {
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    open();
+    await user.type(field(), "lu");
+    await waitFor(() => expect(fetchMock.mock.calls.map(urlOf)).toContain("/api/pessoas?busca=lu"));
+    const signals = fetchMock.mock.calls.map((call) => (call[1] as { signal: AbortSignal }).signal);
+    // Só a leitura mais recente segue valendo.
+    expect(signals.slice(0, -1).every((signal) => signal.aborted)).toBe(true);
+    expect(signals.at(-1)!.aborted).toBe(false);
+  });
+
+  it("o Enter durante uma busca nova não abre o resultado da busca anterior", async () => {
+    fetchMock.mockImplementation(async (url: string) => (url.endsWith("busca=") ? reply([ALFREDO]) : new Promise(() => {})));
+    const user = userEvent.setup();
+    open();
+    await screen.findByRole("list", { name: "Pessoas" });
+    await user.type(field(), "lu");
+    await user.keyboard("{Enter}");
+    expect(action).not.toHaveBeenCalled();
+  });
+
   it("mostra o carregando enquanto a busca não responde", async () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     open();

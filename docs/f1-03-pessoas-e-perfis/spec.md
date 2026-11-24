@@ -207,12 +207,15 @@ conversa ativa na lateral. Nenhum componente novo: tudo é instância de `Person
   erro novo em mensagem de tela.
 - **Busca:** o diálogo é um componente de cliente que lê por `GET /api/pessoas`, uma rota do BFF que
   repassa o cookie à API do chat, com SWR (LLD, "Cliente"). Cada digitação cancela a leitura
-  anterior. O termo e o resultado escolhido ficam no estado do diálogo.
+  anterior. A lista de resultados é uma lista comum de botões e links, com o foco movido pelas setas, e
+  não um `listbox`: o link "Ver perfil" ao lado de cada resultado não cabe dentro de um `listbox` (o axe
+  acusa `aria-required-children`). O termo e o resultado escolhido ficam no estado do diálogo.
 - **Abrir conversa direta:** uma Server Action chama `POST /v1/conversas/diretas` e redireciona para a
   conversa, a mesma da F1-02, agora chamada pelo diálogo e pelo Perfil (ADR 0024). Valida o id com Zod
   antes de chamar a API.
-- **Perfil:** página Server Component em `/pessoas/[id]`. Id sem resultado vira a tela de "não
-  encontrado" do Next. O botão de conversa direta fica oculto no Perfil do próprio membro, que a
+- **Perfil:** página Server Component em `/pessoas/[id]`. Id sem resultado mostra a tela de "não
+  encontrado" (frame `Pessoas / Perfil / Não encontrado`) no corpo da própria página, como a conversa
+  inexistente da F1-02. O botão de conversa direta fica oculto no Perfil do próprio membro, que a
   página reconhece pelo membro da sessão.
 - **Casca:** a seção "Conversas diretas" da lateral ganha o botão que abre o diálogo, no lugar do
   seletor da F1-02. O LLD passa as duas telas a `planejada` (feito nesta spec) e a `existe` quando a

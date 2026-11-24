@@ -13,7 +13,8 @@ const MAX = 30;
 export function deriveUsernames(emails: string[]): string[] {
   const taken = new Set<string>();
   return emails.map((email) => {
-    const local = email.slice(0, email.indexOf('@') === -1 ? undefined : email.indexOf('@'));
+    const at = email.indexOf('@');
+    const local = at === -1 ? email : email.slice(0, at);
     const base = local.toLowerCase().replace(/[^a-z0-9._-]/g, '_').padEnd(MIN, '_').slice(0, MAX);
     let candidate = base;
     for (let n = 2; taken.has(candidate); n++) {

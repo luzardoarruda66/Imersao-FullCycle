@@ -10,6 +10,11 @@ export const normalizeEmail = (email: string) => email.trim().normalize('NFC').t
 
 export class EmailAlreadyRegisteredError extends Error {}
 export class UsernameAlreadyTakenError extends Error {}
+
+const USERNAME_CONSTRAINT = 'UQ_people_username';
+const isUniqueViolation = (error: { code?: string }) => error.code === '23505';
+const isUsernameConflict = (error: { code?: string; constraint?: string }) =>
+  isUniqueViolation(error) && error.constraint === USERNAME_CONSTRAINT;
 export class PersonNotFoundError extends Error {}
 
 @Injectable()
@@ -38,10 +43,8 @@ export class PeopleService {
     });
     // O índice único é quem decide a corrida entre dois cadastros do mesmo e-mail ou do mesmo @usuário.
     await this.people.insert(person).catch((error: { code?: string; constraint?: string }) => {
-      if (error.code === '23505') {
-        if (error.constraint === 'UQ_people_username') throw new UsernameAlreadyTakenError(person.username);
-        throw new EmailAlreadyRegisteredError(email);
-      }
+      if (isUsernameConflict(error)) throw new UsernameAlreadyTakenError(person.username);
+      if (isUniqueViolation(error)) throw new EmailAlreadyRegisteredError(email);
       throw error;
     });
     return person;
@@ -57,7 +60,7 @@ export class PeopleService {
     await this.people
       .update({ id }, { username: normalized, updatedAt: new Date() })
       .catch((error: { code?: string; constraint?: string }) => {
-        if (error.code === '23505' && error.constraint === 'UQ_people_username') throw new UsernameAlreadyTakenError(normalized);
+        if (isUsernameConflict(error)) throw new UsernameAlreadyTakenError(normalized);
         throw error;
       });
   }

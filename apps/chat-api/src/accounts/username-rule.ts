@@ -8,7 +8,15 @@ export function normalizeUsername(input: string): string {
   return trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
 }
 
-/** Formato do @usuário (LLD, seção 9): uma função só, usada pelo comando `contas` e pela busca. Recebe o valor já normalizado. */
+/** Formato do @usuário (LLD, seção 9): uma função só, usada pelo comando `contas`. Recebe o valor já normalizado. */
 export function isValidUsername(value: string): boolean {
   return FORMAT.test(value);
+}
+
+export const USERNAME_FORMAT_MESSAGE = `@usuário fora do formato: use de ${USERNAME_MIN_LENGTH} a ${USERNAME_MAX_LENGTH} caracteres entre letras minúsculas sem acento, números, ".", "-" e "_".`;
+
+/** O @usuário normalizado, ou a mensagem do que está errado. */
+export function parseUsername(input: string): { username: string } | { error: string } {
+  const username = normalizeUsername(input);
+  return isValidUsername(username) ? { username } : { error: USERNAME_FORMAT_MESSAGE };
 }

@@ -2,7 +2,9 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { SessionService } from '@nestjs/authentication';
 import { emailSchema } from '../auth/auth.schemas.js';
 import { generatePassword } from '../accounts/password-rule.js';
-import { EmailAlreadyRegisteredError, PeopleService } from '../accounts/people.service.js';
+import { EmailAlreadyRegisteredError, PeopleService, UsernameAlreadyTakenError } from '../accounts/people.service.js';
+import { isValidUsername, normalizeUsername } from '../accounts/username-rule.js';
+import { USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../config/values.js';
 
 export interface CommandResult {
   code: number;
@@ -12,7 +14,7 @@ export interface CommandResult {
 
 const USAGE = `Uso: pnpm contas <subcomando>
 
-  criar <email> <nome>        Cria a conta e mostra a senha gerada, uma vez só
+  criar <email> <usuario> <nome>  Cria a conta e mostra a senha gerada, uma vez só
   redefinir-senha <email>     Gera uma senha nova, mostra uma vez e encerra as sessões
   encerrar-sessoes <email>    Encerra todas as sessões da pessoa
   dar-admin <email>           Dá o papel de administrador
@@ -35,15 +37,23 @@ export async function runContas(argv: string[], app: INestApplicationContext): P
 
   switch (subcommand) {
     case 'criar': {
-      const name = rest.join(' ').trim();
-      if (!email || !name) return fail('Informe o e-mail e o nome: criar <email> <nome>');
+      const [rawUsername, ...nameParts] = rest;
+      const name = nameParts.join(' ').trim();
+      if (!email || !rawUsername || !name) return fail('Informe o e-mail, o @usuário e o nome: criar <email> <usuario> <nome>');
       if (!emailSchema.safeParse(email).success) return fail(`E-mail inválido: ${email}`);
+      const username = normalizeUsername(rawUsername);
+      if (!isValidUsername(username)) {
+        return fail(
+          `@usuário fora do formato: use de ${USERNAME_MIN_LENGTH} a ${USERNAME_MAX_LENGTH} caracteres entre letras minúsculas sem acento, números, ".", "-" e "_".`,
+        );
+      }
       const password = generatePassword();
       try {
-        const person = await people.create({ email, name, password });
-        return ok(`Conta criada: ${person.email}\nSenha (mostrada uma vez só): ${password}`);
+        const person = await people.create({ email, username, name, password });
+        return ok(`Conta criada: ${person.email}\nUsuário: @${person.username}\nSenha (mostrada uma vez só): ${password}`);
       } catch (error) {
         if (error instanceof EmailAlreadyRegisteredError) return fail(`Já existe uma conta com o e-mail ${normalized(email)}.`);
+        if (error instanceof UsernameAlreadyTakenError) return fail(`O @${username} já está em uso.`);
         throw error;
       }
     }

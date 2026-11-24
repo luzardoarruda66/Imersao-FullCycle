@@ -12,7 +12,7 @@ for name in link abas sair senha; do
   email="e2e-${name}@fullcycle.dev"
   out=$($COMPOSE exec -T chat-api pnpm contas redefinir-senha "$email" 2>&1 || true)
   if ! grep -q "Senha (mostrada" <<<"$out"; then
-    out=$($COMPOSE exec -T chat-api pnpm contas criar "$email" "E2E $name")
+    out=$($COMPOSE exec -T chat-api pnpm contas criar "$email" "e2e-${name}" "E2E $name")
   fi
   password=$(sed -n 's/.*Senha (mostrada uma vez só): //p' <<<"$out" | head -n1)
   accounts+="\"$name\":{\"email\":\"$email\",\"password\":\"$password\"},"

@@ -102,6 +102,38 @@ describe('Não lidas e menções (e2e)', () => {
     });
   });
 
+  describe('acesso', () => {
+    it('as rotas novas recusam sem cookie, com cookie inválido e depois de a sessão ser encerrada', async () => {
+      const id = await channel(ana, 'geral', 'publico');
+      const message = (await send(ana, id)).body.id;
+      const ended = { ...bia };
+      await t.http().delete('/v1/sessoes/atual').set('Cookie', ended.sid).send();
+      const routes = [
+        (sid: string | undefined) => as(t, sid).get(`/v1/conversas/${id}/mensagens?antes=${message}`),
+        (sid: string | undefined) => as(t, sid).post(`/v1/conversas/${id}/leitura`, { mensagem_id: message }),
+        (sid: string | undefined) => as(t, sid).get('/v1/conversas'),
+      ];
+      for (const call of routes) {
+        for (const sid of [undefined, 'sid=invalido', ended.sid]) {
+          const res = await call(sid);
+          expect(res.status).toBe(401);
+          expect(res.body.error.code).toBe('sessao_invalida');
+        }
+      }
+    });
+
+    it('quem não participa não recebe a mensagem nem na reposição depois de reconexão', async () => {
+      const id = await channel(ana, 'fechado', 'privado');
+      const first = await listen(caio);
+      const cursor = first.ready[0]!.ultimo_evento!;
+      first.close();
+      await send(ana, id);
+      const back = await t.connect({ cookie: caio.sid, lastEvent: cursor });
+      await back.waitFor(() => back.ready.length === 1);
+      expect(eventsOf(back, 'mensagem_criada')).toEqual([]);
+    });
+  });
+
   describe('evento mensagem_criada', () => {
     it('leva as contagens de cada pessoa já com a soma, e as do autor não mudam', async () => {
       const id = await channel(ana, 'geral', 'publico');

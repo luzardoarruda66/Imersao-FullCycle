@@ -147,7 +147,11 @@ export function ConversationPane({
       <MessageComposer
         conversationId={conversationId}
         placeholder={placeholder}
-        onSent={(message) => setMessages((current) => mergeMessages(current, [message]))}
+        onSent={(message) => {
+          setMessages((current) => mergeMessages(current, [message]));
+          // A mensagem enviada encerra o "digitando": o da próxima não espera o intervalo.
+          lastTypingSent.current = 0;
+        }}
         onTyping={sendTyping}
       />
     </>

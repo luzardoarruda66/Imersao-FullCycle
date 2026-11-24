@@ -1,7 +1,7 @@
 import type { ChatEvent, ChatMessage } from "chat-events";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { markReadAction } from "@/app/actions/conversations";
+import { markReadAction, sendMessageAction } from "@/app/actions/conversations";
 import { fetchMessagePage } from "@/lib/reading";
 import { ConversationPane } from "./conversation-pane";
 
@@ -237,6 +237,21 @@ describe("ConversationPane", () => {
       expect(sendTyping).toHaveBeenCalledTimes(1);
       now += 1;
       await user.type(field, "á");
+      expect(sendTyping).toHaveBeenCalledTimes(2);
+      clock.mockRestore();
+    });
+
+    it("depois de enviar a mensagem, o próximo digitando não espera o intervalo", async () => {
+      const now = 1_000_000;
+      const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+      vi.mocked(sendMessageAction).mockResolvedValue({ status: "sent", message: message("m2", "oi", "c1", "2026-11-24T10:05:00.000Z") });
+      const user = userEvent.setup();
+      render(pane([message("m1", "primeira")]));
+      const field = screen.getByRole("textbox", { name: "Mensagem para #geral" });
+      await user.type(field, "oi{Enter}");
+      await screen.findByText("oi");
+      expect(sendTyping).toHaveBeenCalledTimes(1);
+      await user.type(field, "n");
       expect(sendTyping).toHaveBeenCalledTimes(2);
       clock.mockRestore();
     });

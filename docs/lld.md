@@ -268,7 +268,7 @@ exigem estão em "Conceitos transversais de implementação", seção "Concorrê
 
 | Banco | Entidade (HLD, seção 7) | Situação |
 | --- | --- | --- |
-| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único | existe |
+| Chat | Pessoas (perfil, papel de administrador, permissão de dados). E-mail gravado sem espaços nas pontas e em minúsculas, com índice único. **Alteração `planejada` (F1-03):** @usuário (`username`) obrigatório e único, gravado em minúsculas; cargo, telefone e status opcionais, lidos pela F1-03 e escritos pela F1-07. A busca ignora acentos e maiúsculas com a extensão `unaccent` do Postgres. As contas existentes recebem o @usuário na migração, derivado da parte do e-mail antes do `@`, com sufixo numérico se colidir | existe |
 | Chat | Sessões, no formato do `SessionStore` do `@nestjs/authentication` | existe |
 | Chat | Tentativas de entrar (e-mail normalizado e IP, erros seguidos, fim da espera), do limite de tentativas (HLD 6.1) | existe |
 | Chat | Conversas, numa tabela só com o tipo (canal público, canal privado ou direta), e participantes. Nome do canal único sem diferenciar maiúsculas; um par de membros só tem uma conversa direta | a detalhar |
@@ -317,6 +317,8 @@ de eventos do WebSocket estão a definir. O único comportamento já decidido:
 | `DELETE /v1/sessoes/atual` (API do chat) | existe | Sair: apaga a sessão do cookie e devolve o `Set-Cookie` que o expira |
 | `GET /v1/eu` (API do chat) | existe | O membro da sessão. Sem sessão válida: `sessao_invalida` (401), código de toda rota com sessão |
 | `PUT /v1/eu/senha` (API do chat) | existe | Trocar a senha: "Sessão e login". Erros: `senha_atual_incorreta` (422), `senha_fraca` (422, com `details.regras_faltando`) |
+| `GET /v1/pessoas` (API do chat) | planejada | Busca de pessoas, com sessão. A busca (`busca`) casa com parte do nome ou do @usuário, sem diferenciar maiúsculas e acentos; um `@` inicial é ignorado. Não devolve quem busca. Ordena por nome e devolve no máximo `resultados da busca de pessoas`. Com a busca vazia, devolve os primeiros membros nessa ordem. Cada item traz id, nome e @usuário |
+| `GET /v1/pessoas/:id` (API do chat) | planejada | Perfil de qualquer membro, com sessão: id, nome, @usuário, cargo, telefone e status. Nunca devolve e-mail, papel de administrador nem permissão de dados. Id que não existe ou que não é um UUID: `pessoa_inexistente` (404) |
 
 ## 6. Estados e regras
 
@@ -361,6 +363,9 @@ Os números estão em "Valores e configuração".
   geram uma senha aleatória que cumpre a `regra da senha` e a mostram uma vez só; não há troca
   obrigatória no primeiro acesso. Encerrar as sessões, ou redefinir a senha, apaga todas as
   sessões da pessoa.
+  **Alteração `planejada` (F1-03):** `criar` passa a receber e-mail, @usuário e nome, e o subcomando
+  `definir-usuario` troca o @usuário de uma conta. @usuário em uso ou fora do formato
+  (`formato do @usuário`) é recusado, com mensagem clara.
 
 ## 7. Processos de segundo plano
 
@@ -384,8 +389,8 @@ definir.
 | A definir | Sessão | Histórico da conversa | Enviar, editar, apagar, citar; "digitando"; botões de resposta pronta | a detalhar |
 | A definir (lateral) | Sessão | Conversas, com não lidas e menções | Abrir conversa | a detalhar |
 | A definir | Sessão | Atividade: Menções, DMs, Tarefas | Abrir a mensagem; concluir e reabrir tarefa | a detalhar |
-| A definir | Sessão | Perfil próprio e de outras pessoas | Editar o próprio perfil e a presença | a detalhar |
-| A definir | Sessão | Busca de pessoas | Abrir conversa direta | a detalhar |
+| `/pessoas/[id]` | Sessão | Perfil de qualquer membro, pelo id e não pelo @usuário, para o link não quebrar se a operação trocar o @usuário | Abrir conversa direta, menos no próprio Perfil. Editar o próprio perfil e a presença são da F1-07 | planejada |
+| Diálogo na lateral, aberto pela seção "Conversas diretas" | Sessão | Busca de pessoas, por `GET /api/pessoas` no BFF, com SWR | Abrir conversa direta ou o Perfil; substitui o seletor de membros da F1-02 | planejada |
 | A definir | Sessão | — | Criar canal; convidar para canal privado | a detalhar |
 | A definir | Sessão; conectar e desconectar só para administrador | Agentes e estado de conexão | Conectar e desconectar agente | a detalhar |
 
@@ -448,6 +453,8 @@ atualiza esse cache direto, sem nova requisição.
 | Mensagens devolvidas por leitura, sem paginação | 50 mais recentes, em ordem cronológica (até a F1-04) | API do chat | A definir |
 | Tamanho do nome do canal | 1 a 80 caracteres | API do chat | A definir |
 | Tamanho da mensagem | Até 4.000 caracteres | API do chat | A definir |
+| Formato do @usuário | 3 a 30 caracteres: letras minúsculas, números, `.`, `-` e `_` (PRD da F1-03) | API do chat | A definir |
+| Resultados da busca de pessoas | No máximo 20 | API do chat | A definir |
 
 **Variáveis de ambiente**
 

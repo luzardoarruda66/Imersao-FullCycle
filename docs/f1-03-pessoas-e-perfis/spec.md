@@ -116,20 +116,47 @@ F1-07 os preenche, então aparecem como "Não informado".
 
 ## Decisões de implementação
 
-**Arquivo de design.** O Figma do projeto é o `GXeHfkmxrSH9mGMHTweQSP` (`docs/design-system.md`). A
-F1-03 precisa de frames novos na página Telas, nos temas claro e escuro, como a F1-02 teve. Eles são
-o primeiro passo da implementação, e o PR que os desenha acrescenta os node-ids a esta tabela. A
-mesma seção de design da F1-02 define a convenção: cada tela tem um frame claro e um escuro, com o
-sufixo `(escuro)`, e o tema vem do modo `Semantic` da variable.
+**Arquivo de design.** O Figma do projeto é o `GXeHfkmxrSH9mGMHTweQSP` (`docs/design-system.md`).
+Os frames desta entrega estão na seção `F1-03 Pessoas e perfis` (`2071:82454`) da página Telas, nos
+temas claro e escuro, e são o que o código implementa pelo fluxo "Do Figma para o código" do design
+system. Cada tela tem dois frames: o claro, sem sufixo, e o escuro, com o sufixo `(escuro)`. O tema vem
+do modo `Semantic` da variable, definido no próprio frame (`Light` ou `Dark`): a página Telas tem o
+modo `Dark` por padrão, então um frame sem o modo explícito aparece escuro.
 
-| Tela | Frame | Estados |
-| --- | --- | --- |
-| Buscar pessoas (diálogo) | `Pessoas / Buscar / ...` | Busca vazia com os primeiros membros; com resultados; sem resultado; carregando; erro ao carregar; abrindo a conversa; falha ao abrir |
-| Perfil | `Pessoas / Perfil / ...` | Completo; campos não informados; próprio Perfil (sem o botão de conversa direta); não encontrado |
+| Tela | Frame (claro) | Node-id claro | Node-id escuro |
+| --- | --- | --- | --- |
+| Buscar pessoas | `Pessoas / Buscar / Busca vazia` | `2071:82455` | `2071:82491` |
+| Buscar pessoas | `Pessoas / Buscar / Com resultados` | `2071:82527` | `2071:82563` |
+| Buscar pessoas | `Pessoas / Buscar / Sem resultado` | `2071:82599` | `2071:82635` |
+| Buscar pessoas | `Pessoas / Buscar / Carregando` | `2071:82671` | `2071:82707` |
+| Buscar pessoas | `Pessoas / Buscar / Erro ao carregar` | `2071:82743` | `2071:82779` |
+| Buscar pessoas | `Pessoas / Buscar / Abrindo a conversa` | `2071:82815` | `2071:82851` |
+| Buscar pessoas | `Pessoas / Buscar / Falha ao abrir` | `2071:82887` | `2071:82923` |
+| Perfil | `Pessoas / Perfil / Completo` | `2075:87238` | `2075:87495` |
+| Perfil | `Pessoas / Perfil / Campos não informados` | `2075:87748` | `2075:88001` |
+| Perfil | `Pessoas / Perfil / Próprio perfil` | `2075:88254` | `2075:88501` |
+| Perfil | `Pessoas / Perfil / Não encontrado` | `2075:88748` | `2075:89007` |
 
-Os frames partem dos de referência do Perfil e dos diálogos da casca, e do seletor "Escolher membro"
-da F1-02, que o diálogo de busca substitui. O Perfil não traz presença nem edição (F1-07), e a
-presença sai também dos resultados.
+Os frames da busca partem do seletor "Escolher membro" da F1-02 (`Canais / Conversa direta / Escolher
+membro`), que o diálogo de busca substitui, e os do Perfil partem do mesmo shell (Rail e Sidebar), sem
+conversa ativa na lateral. Nenhum componente novo: tudo é instância de `PersonRow`, `Input`, `Button`,
+`EmptyState`, `Skeleton`, `Spinner` e `UserAvatar`. O que é específico desta entrega:
+
+- **Diálogo de busca:** título "Nova conversa" e descrição "Busque por nome ou @usuário para conversar
+  em particular.". O campo de busca (`Input` com ícone) abre com o foco. Cada resultado é um `PersonRow`
+  com nome e `@usuário` (sem cargo e sem presença) e um botão `Button` ghost `sm` "Ver perfil" à
+  direita. A linha ativa pelo teclado usa o fundo `surface-subtle`.
+- **Sem resultado e erro:** `EmptyState` compacto, com a mensagem "Nenhum membro com “…” no nome ou no
+  @usuário." e, no erro, o botão "Tentar de novo", mantendo o termo digitado no campo.
+- **Carregando:** três linhas de `Skeleton`. **Abrindo a conversa:** a linha escolhida troca o botão
+  por um `Spinner`, e as outras ficam com `opacity-50` (estado desabilitado do design system).
+- **Falha ao abrir:** texto de erro em linha dentro do diálogo, o mesmo padrão da F1-02, com o
+  diálogo aberto.
+- **Perfil:** página com cabeçalho "Perfil" e, no corpo, `UserAvatar` `xl`, nome, `@usuário`, e os
+  campos Cargo, Telefone e Status, cada um com rótulo e valor, ou "Não informado" em `fg-subtle`. O
+  botão `Button` secondary `md` "Enviar mensagem" aparece nos Perfis de outras pessoas e some no
+  próprio Perfil. Sem presença, sem e-mail e sem hora local (diferente do `ProfilePanel`, que fica
+  para a F1-07). O estado "Não encontrado" usa `EmptyState` com o botão "Voltar ao início".
 
 **Modelo de dados (Banco do chat)**
 

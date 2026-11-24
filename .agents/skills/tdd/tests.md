@@ -22,6 +22,25 @@ Characteristics:
 - Describes WHAT, not HOW
 - One logical assertion per test
 
+**Unit-style**: Test one unit through its exported interface, one rule per test, with literal expectations.
+
+```typescript
+// GOOD: one rule and one edge per test, expected values are literals
+test("safeRedirect accepts a path inside the product", () => {
+  expect(safeRedirect("/conversas/42")).toBe("/conversas/42");
+});
+
+test("safeRedirect sends a protocol-relative URL to the home page", () => {
+  expect(safeRedirect("//evil.example")).toBe("/");
+});
+```
+
+Characteristics:
+
+- Calls the unit directly, with no I/O and no mock of its own collaborators
+- Covers each rule, boundary value and error branch of the unit
+- The test name states the rule, so a failure names what broke
+
 ## Bad Tests
 
 **Implementation-detail tests**: Coupled to internal structure.

@@ -1,5 +1,5 @@
 import { callChatApi } from "@/server/chat-api";
-import { editMessageAction, sendMessageAction } from "./conversations";
+import { deleteMessageAction, editMessageAction, sendMessageAction } from "./conversations";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
@@ -86,5 +86,32 @@ describe("editMessageAction", () => {
     api.mockResolvedValue({ kind: "unavailable" });
     const result = await call("novo");
     expect(result).toEqual({ status: "error", message: "Não foi possível salvar a edição. Verifique a conexão e tente de novo. O texto foi mantido." });
+  });
+});
+
+describe("deleteMessageAction", () => {
+  const deleted = { id: "m1", texto: "", apagada: true };
+  beforeEach(() => {
+    api.mockReset();
+    api.mockResolvedValue({ kind: "ok", status: 200, data: deleted as never });
+  });
+
+  it("pede a exclusão na rota da mensagem e devolve a mensagem apagada", async () => {
+    expect(await deleteMessageAction("c1", "m1")).toEqual({ status: "deleted", message: deleted });
+    expect(api).toHaveBeenCalledWith("/v1/conversas/c1/mensagens/m1", { method: "DELETE" });
+  });
+
+  it.each([
+    ["prazo_encerrado", "O prazo de 4 horas para apagar esta mensagem acabou."],
+    ["mensagem_de_outra_pessoa", "Só quem escreveu a mensagem pode apagá-la."],
+    ["mensagem_inexistente", "Esta mensagem não existe mais."],
+  ])("traduz %s em mensagem de tela", async (code, message) => {
+    api.mockResolvedValue({ kind: "error", status: 422, code, message: "x" });
+    expect(await deleteMessageAction("c1", "m1")).toEqual({ status: "error", message });
+  });
+
+  it("com a API fora do ar, diz para tentar de novo", async () => {
+    api.mockResolvedValue({ kind: "unavailable" });
+    expect(await deleteMessageAction("c1", "m1")).toEqual({ status: "error", message: "Não foi possível apagar a mensagem. Verifique a conexão e tente de novo." });
   });
 });

@@ -1,8 +1,8 @@
 import type { ChatEvent, ChatMessage } from "chat-events";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
-import { editMessageAction, markReadAction, sendMessageAction } from "@/app/actions/conversations";
+import { deleteMessageAction, editMessageAction, markReadAction, sendMessageAction } from "@/app/actions/conversations";
 import { fetchMessagePage } from "@/lib/reading";
 import { ConversationPane } from "./conversation-pane";
 
@@ -20,7 +20,7 @@ vi.mock("@/lib/realtime/realtime", () => ({
     sendTyping,
   }),
 }));
-vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), editMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
+vi.mock("@/app/actions/conversations", () => ({ sendMessageAction: vi.fn(), editMessageAction: vi.fn(), deleteMessageAction: vi.fn(), markReadAction: vi.fn().mockResolvedValue({ ok: true }) }));
 vi.mock("@/lib/reading", async (original) => ({ ...(await original<typeof import("@/lib/reading")>()), fetchMessagePage: vi.fn() }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -59,6 +59,126 @@ const pane = (initial: ChatMessage[], hasMore = false) => (
 
 const setVisibility = (state: "visible" | "hidden") =>
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+
+describe("ConversationPane: exclusão", () => {
+  const delAction = vi.mocked(deleteMessageAction);
+  const mine = (n: number, over: Partial<ChatMessage> = {}): ChatMessage => ({ ...message(`m${n}`, `texto ${n}`, "c1", `2026-11-24T10:0${n}:00.000Z`), ...over });
+  const deletedOf = (m: ChatMessage): ChatMessage => ({ ...m, texto: "", mencoes: [], citacao: null, apagada: true });
+  const deletable = (initial: ChatMessage[]) => (
+    <ConversationPane conversationId="c1" placeholder="Mensagem para #geral" initialMessages={initial} initialHasMore={false} intro={null} currentMemberId="p1" />
+  );
+  const deletedEvent = (id: string, conversa = "c1") =>
+    ({ id: `e-del-${id}`, tipo: "mensagem_apagada", momento: "agora", dados: { conversa_id: conversa, mensagem_id: id } }) as ChatEvent;
+  const askToDelete = async (user: ReturnType<typeof userEvent.setup>, index = 0) => {
+    await user.click(screen.getAllByRole("button", { name: "Mais ações" })[index]!);
+    await user.click(await screen.findByRole("menuitem", { name: "Apagar" }));
+  };
+
+  beforeEach(() => {
+    for (const key of Object.keys(handlers)) delete handlers[key];
+    delAction.mockReset();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-24T10:30:00.000Z"));
+    setVisibility("visible");
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("Apagar pede confirmação com o trecho da mensagem, e Cancelar fecha sem apagar", async () => {
+    const user = userEvent.setup();
+    render(deletable([mine(1)]));
+    await askToDelete(user);
+    const dialog = screen.getByRole("alertdialog", { name: "Apagar mensagem?" });
+    expect(dialog).toHaveTextContent("texto 1");
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(delAction).not.toHaveBeenCalled();
+    expect(screen.getByText("texto 1")).toBeInTheDocument();
+  });
+
+  it("confirmar apaga: a mensagem vira \"Mensagem apagada\", sem texto nem barra de ações, e o diálogo fecha", async () => {
+    const original = mine(1);
+    delAction.mockResolvedValue({ status: "deleted", message: deletedOf(original) });
+    const user = userEvent.setup();
+    render(deletable([original]));
+    await askToDelete(user);
+    await user.click(screen.getByRole("button", { name: "Apagar" }));
+    expect(delAction).toHaveBeenCalledWith("c1", "m1");
+    expect(await screen.findByText("Mensagem apagada")).toBeInTheDocument();
+    expect(screen.queryByText("texto 1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Ações da mensagem" })).not.toBeInTheDocument();
+  });
+
+  it("o erro da API aparece no diálogo, que continua aberto, e a mensagem fica como estava", async () => {
+    delAction.mockResolvedValue({ status: "error", message: "O prazo de 4 horas para apagar esta mensagem acabou." });
+    const user = userEvent.setup();
+    render(deletable([mine(1)]));
+    await askToDelete(user);
+    await user.click(screen.getByRole("button", { name: "Apagar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("O prazo de 4 horas para apagar");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(within(screen.getByRole("log")).getByText("texto 1")).toBeInTheDocument();
+  });
+
+  it("a exclusão de outra pessoa chega pelo tempo real e troca a mensagem por \"Mensagem apagada\"", () => {
+    render(deletable([mine(1, { autor: { id: "p2", nome: "Bia", usuario: "bia" } }), mine(2)]));
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    expect(screen.getByText("Mensagem apagada")).toBeInTheDocument();
+    expect(screen.queryByText("texto 1")).not.toBeInTheDocument();
+    expect(screen.getByText("texto 2")).toBeInTheDocument();
+  });
+
+  it("a mesma exclusão entregue duas vezes (resposta e evento) não estraga a tela", async () => {
+    const original = mine(1);
+    delAction.mockResolvedValue({ status: "deleted", message: deletedOf(original) });
+    const user = userEvent.setup();
+    render(deletable([original, mine(2)]));
+    await askToDelete(user);
+    await user.click(screen.getByRole("button", { name: "Apagar" }));
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    expect(await screen.findAllByText("Mensagem apagada")).toHaveLength(1);
+    expect(screen.getByText("texto 2")).toBeInTheDocument();
+  });
+
+  it("evento de outra conversa, ou de mensagem que não está carregada, não faz nada", () => {
+    render(deletable([mine(1)]));
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1", "c2")));
+    act(() => handlers.mensagem_apagada!(deletedEvent("m9")));
+    expect(screen.getByText("texto 1")).toBeInTheDocument();
+    expect(screen.queryByText("Mensagem apagada")).not.toBeInTheDocument();
+  });
+
+  it("a citação carregada à apagada mostra \"Mensagem apagada\", sem o trecho, e deixa de ser um link", () => {
+    const original = mine(1, { autor: { id: "p2", nome: "Bia", usuario: "bia" } });
+    const reply = mine(2, { citacao: { id: "m1", autor: original.autor, trecho: "texto 1", apagada: false } });
+    render(deletable([original, reply]));
+    expect(screen.getByRole("button", { name: /Ir para a mensagem de Bia/ })).toBeInTheDocument();
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    expect(screen.queryByRole("button", { name: /Ir para a mensagem de Bia/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Mensagem apagada").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("se a mensagem que está sendo citada é apagada, a citação sai do campo", async () => {
+    const user = userEvent.setup();
+    const other = mine(1, { autor: { id: "p2", nome: "Bia", usuario: "bia" } });
+    render(deletable([other]));
+    await user.click(screen.getByRole("button", { name: "Citar" }));
+    expect(screen.getByRole("group", { name: "Citação" })).toBeInTheDocument();
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    expect(screen.queryByRole("group", { name: "Citação" })).not.toBeInTheDocument();
+  });
+
+  it("se a mensagem que está sendo editada é apagada, o editor fecha", async () => {
+    const user = userEvent.setup();
+    render(deletable([mine(1)]));
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    expect(screen.getByRole("textbox", { name: "Editar mensagem" })).toBeInTheDocument();
+    act(() => handlers.mensagem_apagada!(deletedEvent("m1")));
+    expect(screen.queryByRole("textbox", { name: "Editar mensagem" })).not.toBeInTheDocument();
+    expect(screen.getByText("Mensagem apagada")).toBeInTheDocument();
+  });
+});
 
 describe("ConversationPane: edição", () => {
   const editAction = vi.mocked(editMessageAction);
@@ -312,7 +432,7 @@ describe("ConversationPane", () => {
     it("cancela as inscrições ao sair da conversa", () => {
       const { unmount } = render(pane([]));
       unmount();
-      expect(unsubscribe).toHaveBeenCalledTimes(3);
+      expect(unsubscribe).toHaveBeenCalledTimes(4);
     });
   });
 

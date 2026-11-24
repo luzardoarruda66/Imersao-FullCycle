@@ -33,6 +33,10 @@ export type EditMessageResult =
   | { status: "edited"; message: ChatMessage }
   | { status: "error"; message: string };
 
+export type DeleteMessageResult =
+  | { status: "deleted"; message: ChatMessage }
+  | { status: "error"; message: string };
+
 export type SendMessageState =
   | { status: "idle" }
   | { status: "sent"; message: ChatMessage }
@@ -118,6 +122,27 @@ export async function markReadAction(conversationId: string, messageId: string):
   const result = await markConversationRead(parsed.data.conversationId, parsed.data.messageId);
   if (result.kind === "invalid-session") return endSession();
   return { ok: result.kind === "ok" };
+}
+
+const DELETE_ERRORS: Record<string, string> = {
+  prazo_encerrado: "O prazo de 4 horas para apagar esta mensagem acabou.",
+  mensagem_de_outra_pessoa: "Só quem escreveu a mensagem pode apagá-la.",
+};
+
+/**
+ * Apaga a própria mensagem. A API confere o autor e o prazo de 4 horas, e apagar de novo é sucesso sem efeito; o erro
+ * volta como texto para o diálogo de confirmação, que continua aberto.
+ */
+export async function deleteMessageAction(conversationId: string, messageId: string): Promise<DeleteMessageResult> {
+  const result = await callChatApi<ChatMessage>(
+    `/v1/conversas/${encodeURIComponent(conversationId)}/mensagens/${encodeURIComponent(messageId)}`,
+    { method: "DELETE" },
+  );
+  if (result.kind === "ok") return { status: "deleted", message: result.data };
+  if (result.kind === "invalid-session") return endSession();
+  const fallback = "Não foi possível apagar a mensagem. Verifique a conexão e tente de novo.";
+  if (result.kind !== "error") return { status: "error", message: fallback };
+  return { status: "error", message: DELETE_ERRORS[result.code] ?? conversationErrorMessage(result.code, fallback) };
 }
 
 /**

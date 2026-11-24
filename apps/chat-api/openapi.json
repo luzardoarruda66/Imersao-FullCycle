@@ -573,6 +573,36 @@
         "tags": [
           "conversas"
         ]
+      },
+      "delete": {
+        "operationId": "ConversationsController_deleteMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mensagemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Apagar a própria mensagem, até 4 horas depois do envio; apagar de novo não faz nada",
+        "tags": [
+          "conversas"
+        ]
       }
     },
     "/v1/membros": {

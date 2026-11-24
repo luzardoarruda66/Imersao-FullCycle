@@ -67,6 +67,37 @@ describe("MessageList: editar", () => {
     expect(onEdit).toHaveBeenCalledWith(message);
   });
 
+  it("Apagar fica só no menu, depois de Editar, e entrega a mensagem; some fora do prazo e na apagada", async () => {
+    const onDelete = vi.fn();
+    const message = msg();
+    const { unmount } = render1(message, { onDelete, onEdit: () => {}, onQuote: () => {} });
+    const toolbar = [...screen.getByRole("group", { name: "Ações da mensagem" }).querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
+    expect(toolbar).toEqual(["Citar", "Copiar texto", "Editar", "Mais ações"]);
+    await userEvent.click(screen.getByRole("button", { name: "Mais ações" }));
+    const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(items).toEqual(["Citar", "Copiar texto", "Editar", "Apagar"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Apagar" }));
+    expect(onDelete).toHaveBeenCalledWith(message);
+    unmount();
+
+    const late = render1(msg({ criada_em: new Date(NOW - EDIT_WINDOW_MS - 1000).toISOString() }), { onDelete });
+    await userEvent.click(screen.getByRole("button", { name: "Mais ações" }));
+    expect(screen.queryByRole("menuitem", { name: "Apagar" })).not.toBeInTheDocument();
+    late.unmount();
+    render1(msg({ apagada: true, texto: "" }), { onDelete });
+    expect(screen.queryByRole("button", { name: "Mais ações" })).not.toBeInTheDocument();
+  });
+
+  it("de outra pessoa, ou sem quem trate a exclusão, não há Apagar", async () => {
+    const other = render1(msg({ autor: { id: "p2", nome: "Bia", usuario: "bia" } }), { onDelete: () => {} });
+    await userEvent.click(screen.getByRole("button", { name: "Mais ações" }));
+    expect(screen.queryByRole("menuitem", { name: "Apagar" })).not.toBeInTheDocument();
+    other.unmount();
+    render1(msg());
+    await userEvent.click(screen.getByRole("button", { name: "Mais ações" }));
+    expect(screen.queryByRole("menuitem", { name: "Apagar" })).not.toBeInTheDocument();
+  });
+
   it("mostra \"(editada)\" na mensagem editada, com o texto, e nada na que não foi", () => {
     const edited = render1(msg({ editada_em: new Date(NOW).toISOString(), texto: "texto novo" }));
     expect(screen.getByText("(editada)")).toBeInTheDocument();

@@ -12,5 +12,6 @@ import { TypeOrmSessionStore } from './typeorm-session.store.js';
   imports: [AccountsModule, LoginAttemptsModule],
   controllers: [SessionsController, MeController],
   providers: [SessionAuth, TypeOrmSessionStore, LoginService, PasswordService],
+  exports: [TypeOrmSessionStore],
 })
 export class AuthModule {}

@@ -13,12 +13,15 @@ services:
       DATABASE_URL: postgres://chat_api:chat_api@postgres:5432/chat
       COOKIE_DOMAIN: ""
       WEB_ORIGIN: http://localhost:3000
+      REDIS_URL: redis://redis:6379
       # Rede interna do Compose, de onde vem o BFF (LLD, "Segurança": origem do IP).
       TRUSTED_PROXY: loopback,linklocal,uniquelocal
     ports:
       - "3001:3001"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -31,6 +34,8 @@ services:
     environment:
       # Endereço da API do chat entre contêineres (AGENTS.md da raiz, "Rede entre serviços").
       CHAT_API_URL: http://chat-api:3001
+      # O navegador fala com a API do chat direto pelo WebSocket (LLD, seção 8): endereço da máquina, não do contêiner.
+      NEXT_PUBLIC_CHAT_WS_URL: http://localhost:3001
       COOKIE_DOMAIN: ""
     ports:
       - "3000:3000"
@@ -60,6 +65,16 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

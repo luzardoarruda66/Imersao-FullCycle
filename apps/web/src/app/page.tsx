@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { RealtimeConnection } from "@/app/components/realtime/realtime-connection";
 import { SessionError } from "@/app/components/auth/session-error";
 import { Rail } from "@/app/components/workspace-nav/rail";
 import { getSessionState } from "@/server/session";
@@ -23,6 +24,7 @@ async function Shell() {
   if (session.kind === "unavailable") return <SessionError />;
   return (
     <div className="flex h-screen">
+      <RealtimeConnection />
       <Rail memberName={session.member.nome} />
       <aside aria-label="Conversas" className="w-sidebar shrink-0 bg-sidebar" />
       <main aria-label="Conversa" className="flex-1 bg-surface" />

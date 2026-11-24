@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { AuthenticationStorage, type SessionRecord, type SessionStore } from '@nestjs/authentication';
-import { DataSource, LessThan, LessThanOrEqual } from 'typeorm';
+import { DataSource, In, LessThan, LessThanOrEqual, MoreThan } from 'typeorm';
 import { SessionEntity, type Json } from '../database/entities/session.entity.js';
 
 /** `SessionStore` do `@nestjs/authentication` sobre o Banco do chat (ADR 0016). Cada método que decide "só uma vez" é um comando condicional só. */
@@ -38,6 +38,16 @@ export class TypeOrmSessionStore implements SessionStore {
   async deleteSession(id: string): Promise<boolean> {
     const { affected } = await this.manager.delete(SessionEntity, { id });
     return (affected ?? 0) > 0;
+  }
+
+  /** Dos ids dados, os que ainda valem (nem vencidos nem parados além de `idleMs`): uma consulta só, que não renova nada. */
+  async liveSessionIds(ids: string[], now: Date, idleMs: number): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await this.manager.find(SessionEntity, {
+      select: { id: true },
+      where: { id: In(ids), expiresAt: MoreThan(now), lastActiveAt: MoreThan(new Date(now.getTime() - idleMs)) },
+    });
+    return new Set(rows.map((row) => row.id));
   }
 
   async listUserSessions(userId: string): Promise<SessionRecord[]> {

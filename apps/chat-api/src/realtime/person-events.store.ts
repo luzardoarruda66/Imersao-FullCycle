@@ -4,6 +4,7 @@ import { type ChatEvent, type ChatEventDraft, formatEventId, parseEventId } from
 import type { Redis } from 'ioredis';
 import { Clock } from '../clock.js';
 import { RECONNECT_RETENTION_MS } from '../config/values.js';
+import { redactDeleted } from './redact-deleted.js';
 import { REDIS } from './redis.module.js';
 
 const EPOCH_KEY = 'chat:epoch';
@@ -95,7 +96,8 @@ export class PersonEventsStore {
         const stored = JSON.parse(fields[1]!) as Omit<ChatEvent, 'id'>;
         return { id: `${epoch}-${streamId}`, ...stored } as ChatEvent;
       });
-      return { status: 'ok', events };
+      // O que uma mensagem apagada dizia não volta, nem pelo evento que a criou (HLD, seção 7).
+      return { status: 'ok', events: redactDeleted(events) };
     } catch {
       return { status: 'lost' };
     }

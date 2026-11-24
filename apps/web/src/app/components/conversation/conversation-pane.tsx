@@ -249,6 +249,7 @@ export function ConversationPane({
     setDeleting({ message, pending: true });
     const result = await deleteMessageAction(conversationId, message.id);
     if (result.status === "deleted") {
+      // O evento `mensagem_apagada` aplica a mesma exclusão; as duas são idempotentes, e vale a que chegar primeiro.
       setMessages((current) => applyDelete(current, message.id));
       setDeleting(null);
     } else {

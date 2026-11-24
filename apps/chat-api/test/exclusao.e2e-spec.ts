@@ -161,6 +161,22 @@ describe('Exclusão da mensagem (e2e)', () => {
       expect(eventsOf(caioConn, 'mensagem_apagada')).toEqual([]);
     });
 
+    it('na reposição, o texto da mensagem apagada não volta nem no evento de criação nem na citação a ela', async () => {
+      const first = await listen(bia);
+      const start = first.ready[0]!.ultimo_evento!;
+      first.close();
+      const secret = await send(ana, 'segredo da Ana');
+      await send(caio, 'respondendo ao segredo', geral, secret.id);
+      await remove(ana, secret.id);
+      const back = await t.connect({ cookie: bia.sid, lastEvent: start });
+      await back.waitFor(() => back.ready.length === 1);
+      expect(eventsOf(back, 'mensagem_criada')).toHaveLength(2);
+      expect(eventsOf(back, 'mensagem_apagada')).toHaveLength(1);
+      expect(JSON.stringify(back.events)).not.toContain('segredo da Ana');
+      const [created] = eventsOf(back, 'mensagem_criada');
+      expect(created!.dados).toMatchObject({ mensagem: { id: secret.id, texto: '', apagada: true } });
+    });
+
     it('entra na reposição de quem voltou depois de uma queda, sem o texto', async () => {
       const m = await send(ana, 'antes');
       const first = await listen(bia);
